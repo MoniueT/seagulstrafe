@@ -102,6 +102,36 @@
   }
   #sceneBanner.show{ opacity:1; transform:translate(-50%,0); }
 
+  /* shown once a completed Daily Challenge day's final results are in and a bonus was earned */
+  #dailyRewardToast{
+    position:fixed; left:50%; top:9%; transform:translate(-50%,-14px); z-index:9;
+    max-width:280px; text-align:center; pointer-events:none;
+    background:linear-gradient(135deg,#FFF3CE,#FFE0A0); border:3px solid var(--ink); border-radius:16px;
+    padding:10px 18px; box-shadow:0 5px 0 var(--ink), 0 8px 18px rgba(0,0,0,.25);
+    opacity:0; transition:opacity .4s, transform .4s;
+  }
+  #dailyRewardToast.show{ opacity:1; transform:translate(-50%,0); }
+  #dailyRewardToast .drtTitle{ font-family:'Baloo 2'; font-weight:800; font-size:15px; color:var(--ink); }
+  #dailyRewardToast .drtBody{ font-family:'Nunito'; font-weight:700; font-size:13px; color:#6b5518; margin-top:2px; }
+
+  /* one-time reticle callout — shown on the player's very first run only, never again */
+  #reticleHint{
+    position:fixed; left:min(150px, 30vw); bottom:calc(148px + env(safe-area-inset-bottom));
+    z-index:7; max-width:180px; pointer-events:none;
+    font-family:'Nunito'; font-weight:800; font-size:12.5px; line-height:1.3; color:#fff; text-align:left;
+    background:rgba(31,36,48,0.88); border:2.5px solid #fff; border-radius:12px; padding:8px 10px;
+    opacity:0; transform:translateY(6px); transition:opacity .3s, transform .3s;
+  }
+  #reticleHint.show{ opacity:1; transform:translateY(0); }
+  #reticleHint .arrow{
+    position:absolute; left:16px; bottom:-9px; width:0; height:0;
+    border-left:8px solid transparent; border-right:8px solid transparent; border-top:9px solid #fff;
+  }
+  #reticleHint .arrow::after{
+    content:""; position:absolute; left:-6px; top:-9px; width:0; height:0;
+    border-left:6px solid transparent; border-right:6px solid transparent; border-top:7px solid rgba(31,36,48,0.88);
+  }
+
   .overlay{
     position:fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:20;
     background:rgba(20,24,20,.55); backdrop-filter: blur(2px); touch-action:manipulation;
@@ -200,6 +230,8 @@
 </div>
 
 <div id="readyToast">💩 LOCKED ON, FIRE!</div>
+<div id="reticleHint">That glowing ring shows exactly where your poo will land<span class="arrow"></span></div>
+<div id="dailyRewardToast"><div class="drtTitle">🏆 Daily Challenge results are in!</div><div class="drtBody" id="drtBody"></div></div>
 <div id="sceneBanner"></div>
 
 <div id="pooBtn">💩</div>
@@ -217,6 +249,7 @@
       <div>💩 <span>Tap the poo button (or hit <b>ENTER</b> on desktop) once it's <b>green &amp; pulsing</b></span></div>
       <div>🐦🍦 <span>Small targets pay out big, large groups pay out small. Everything on the ground is fair game!</span></div>
       <div>🗺️ <span>The scenery changes the longer you fly: city, park, beach and beyond</span></div>
+      <div>🏆 <span>Finish top 10 in Daily Challenge for bonus coins, paid out next time you play once that day's results are final</span></div>
     </div>
     <div class="legend">
       <div class="legendItem"><span class="dot good"></span> Smaller = bigger score</div>
@@ -303,29 +336,58 @@ const SCENES = [
     skyTop:'#5AC7E8', skyBottom:'#FFF3D6',
     groundColor:'#E3C583', groundLine:'rgba(255,255,255,0.35)',
     decor:'beach',
-    farColors:['#1F8FA8','#1B7C92'], nearColors:['#C9AE6C','#BFA260']
+    // farColors: teal, used for the hazy distant-boats horizon strip. nearColors: actual
+    // palm-frond greens for the foreground palm trees — these used to be sandy/khaki tones
+    // left over from an earlier design, which was a big part of why the palms didn't read
+    // as palms at all (green fronds matter more than the trunk/frond shape does).
+    farColors:['#1F8FA8','#1B7C92'], nearColors:['#3E8E52','#2E7A45']
+  },
+  {
+    key:'harbour', name:'⚓ Fishing Harbour',
+    skyTop:'#7FAFC9', skyBottom:'#E9EEF0',
+    groundColor:'#5B6670', groundLine:'rgba(255,255,255,0.16)',
+    decor:'harbour',
+    farColors:['#4A5A66','#3E4C57'], nearColors:['#9A8E78','#7C7263']
+  },
+  {
+    key:'seaside', name:'🏘️ Seaside Town',
+    skyTop:'#8FD3E8', skyBottom:'#FDEBD3',
+    groundColor:'#C9B896', groundLine:'rgba(255,255,255,0.3)',
+    decor:'seaside',
+    // farColors: pastel terraced seafront houses (reuses the shared 'buildings' renderer,
+    // just retinted — the same trick already used for Harbour's warehouses and, previously,
+    // Car Park's supermarket block). nearColors: the candy-stripe beach huts along the prom.
+    farColors:['#E7A6C4','#8FC7DE'], nearColors:['#E85D5D','#3E7BC4']
   }
 ];
 
-const TARGET_SETS = {
-  city:{
-    car:      {emoji:'🚙', pts:90,  w:42, good:true, weight:14},
-    shinyCar: {emoji:'🚗', pts:60,  w:54, good:true, sparkle:true, weight:22},
-    scooter:  {emoji:'🛵', pts:45,  w:30, good:true, weight:28},
-    crowd:    {emoji:'🚶‍♂️🚶‍♀️🚶', pts:30, w:78, good:true, weight:32},
-  },
-  park:{
-    iceCream: {emoji:'🍦', pts:90,  w:42, good:true, weight:14},
-    statue:   {emoji:'🗿', pts:60,  w:54, good:true, sparkle:true, weight:22},
-    jogger:   {emoji:'🏃', pts:45,  w:30, good:true, weight:28},
-    joggers:  {emoji:'🏃‍♂️🏃‍♀️', pts:30, w:78, good:true, weight:32},
-  },
-  beach:{
-    iceCreamB:{emoji:'🍧', pts:90,  w:42, good:true, weight:14},
-    boat:     {emoji:'⛵', pts:60,  w:54, good:true, sparkle:true, weight:22},
-    crab:     {emoji:'🦀', pts:45,  w:28, good:true, weight:28},
-    sunbathers:{emoji:'🏖️', pts:30, w:78, good:true, weight:32},
-  }
+// Ground targets used to be a different set of 4 emoji per scene (20+ types total spread
+// thin). Consolidated down to 5 universal, custom-drawn targets reused in every scene —
+// fewer variations, but each one gets real vector art (see the draw*Art functions below)
+// instead of a plain emoji glyph. ringMul controls the badge size per type; good/small/rare
+// still pays out more than common/large, same balance philosophy as before.
+const TARGETS = {
+  car:      {art:'car',       pts:90, ringMul:0.86, weight:16},
+  flashyCar:{art:'flashyCar', pts:60, ringMul:1.0,  weight:20, sparkle:true},
+  jogger:   {art:'jogger',    pts:45, ringMul:0.6,  weight:26},
+  pram:     {art:'pram',      pts:35, ringMul:0.78, weight:22},
+  crowd:    {art:'crowd',     pts:20, ringMul:1.18, weight:30},
+};
+
+// One extra, scene-exclusive target per scene — mixed into the same spawn pool as the 5
+// universal targets above (see spawnTarget()) rather than replacing them, so each scene
+// keeps a little of its own identity without going back to "20 mediocre types." Weighted
+// about as rare as the rarest universal target (car, weight 16) so finding one feels like a
+// small bonus, and priced generously (with a sparkle) to reward it.
+const SCENE_SPECIALS = {
+  city:    {art:'hotdogCart', pts:110, ringMul:1.05, weight:15, sparkle:true},
+  park:    {art:'picnic',     pts:100, ringMul:1.15, weight:15, sparkle:true},
+  beach:   {art:'sandcastle', pts:95,  ringMul:1.0,  weight:15, sparkle:true},
+  harbour: {art:'sealBuoy',   pts:100, ringMul:0.95, weight:15, sparkle:true},
+  // reuses the iceCreamVan art originally built for the since-removed Car Park scene — it
+  // was sitting unused, and an ice cream van is arguably a better fit for a seafront prom
+  // than it ever was for a car park
+  seaside: {art:'iceCreamVan',pts:105, ringMul:1.1,  weight:15, sparkle:true},
 };
 
 let sceneIndex = -1;
@@ -337,6 +399,10 @@ let score = 0;
 let best = 0;
 let pooCharge = 0;
 const POO_MAX = 100;
+let screenShake = 0; // seconds remaining on the death shake
+const SHAKE_DURATION = 0.4, SHAKE_MAG = 16;
+let seenReticleHint = true; // safe default — stays quiet until loadProgress() confirms a genuinely new player
+let reticleHintTimer = null;
 let comboStreak = 0; // consecutive poo hits with no miss in between
 // Tiered so a long streak is worth chasing but can't inflate the score without limit —
 // the multiplier plateaus at 1.75x no matter how long the streak runs.
@@ -366,10 +432,15 @@ async function saveBest(){
 
 // ---------- skins & lifetime progress ----------
 const SKINS = {
-  classic: {name:'Classic Gull', cost:0,   body:'#FFFFFF', wing:'#E9EDF2', back:'#B9C2CC', trail:null},
-  golden:  {name:'Golden Gull',  cost:150, body:'#FFE9A8', wing:'#FFD866', back:'#E8B93E', trail:'#FFD866'},
-  shadow:  {name:'Shadow Gull',  cost:350, body:'#3A3F4B', wing:'#2A2E38', back:'#1C1F26', trail:'#8890A0'},
-  rainbow: {name:'Rainbow Gull', cost:700, body:'rainbow', wing:'rainbow', back:'rainbow', trail:'rainbow'},
+  classic: {name:'Classic Gull', cost:0,     body:'#FFFFFF', wing:'#E9EDF2', back:'#B9C2CC', trail:null},
+  golden:  {name:'Golden Gull',  cost:150,   body:'#FFE9A8', wing:'#FFD866', back:'#E8B93E', trail:'#FFD866'},
+  sky:     {name:'Sky Gull',     cost:250,   body:'#DCF3FF', wing:'#AEE3FF', back:'#6FBFE0', trail:'#8FE0FF'},
+  shadow:  {name:'Shadow Gull',  cost:350,   body:'#3A3F4B', wing:'#2A2E38', back:'#1C1F26', trail:'#8890A0'},
+  sunset:  {name:'Sunset Gull',  cost:500,   body:'#FFD3A8', wing:'#FF9F68', back:'#C9557A', trail:'#FF7F50'},
+  rainbow: {name:'Rainbow Gull', cost:700,   body:'#fff', wing:'#fff', back:'#fff', trail:'rainbow', special:'rainbow'},
+  neon:    {name:'Neon Gull',    cost:1500,  body:'#12E8DA', wing:'#FF2ED1', back:'#5B12C9', trail:'#12E8DA', glow:'#12E8DA'},
+  // the "why would anyone need this" skin — a genuine grind, and it looks the part
+  diamond: {name:'Diamond Gull', cost:30000, body:'#F5FAFF', wing:'#CFE8FF', back:'#B9D9F2', trail:'#FFFFFF', special:'diamond'},
 };
 let coins = 0;
 let unlockedSkins = ['classic'];
@@ -380,6 +451,7 @@ async function loadProgress(){
   try{ const u = await window.storage.get('gullbomber:unlocked', false); if(u&&u.value) unlockedSkins = JSON.parse(u.value); }catch(e){}
   try{ const s = await window.storage.get('gullbomber:equipped', false); if(s&&s.value && SKINS[s.value]) equippedSkin = s.value; }catch(e){}
   try{ const n = await window.storage.get('gullbomber:name', false); if(n&&n.value) document.getElementById('initialsInput').value = n.value; }catch(e){}
+  try{ const rh = await window.storage.get('gullbomber:seenReticleHint', false); seenReticleHint = !!(rh && rh.value); }catch(e){ seenReticleHint = true; }
   updateCoinUI();
   renderHangar();
 }
@@ -402,11 +474,13 @@ function renderHangar(){
     const owned = unlockedSkins.includes(id);
     const card = document.createElement('div');
     card.className = 'skinCard' + (owned? '' : ' locked') + (equippedSkin===id? ' equipped':'');
-    const swatch = sk.body==='rainbow' ? 'linear-gradient(135deg,#ff5f6d,#ffc371,#47cf73,#3E7BC4,#a86bd6)' : sk.body;
+    const swatch = sk.special==='rainbow' ? 'linear-gradient(135deg,#ff5f6d,#ffc371,#47cf73,#3E7BC4,#a86bd6)'
+      : sk.special==='diamond' ? 'linear-gradient(135deg,#ffffff,#cfe8ff,#f5faff,#dff0ff)'
+      : sk.body;
     card.innerHTML =
-      '<div class="swatch" style="background:'+swatch+'"></div>'+
+      '<div class="swatch" style="background:'+swatch+(sk.glow?';box-shadow:0 0 10px '+sk.glow:'')+'"></div>'+
       '<div class="skinName">'+sk.name+'</div>'+
-      '<div class="skinCost">'+(owned ? (equippedSkin===id?'Equipped':'Tap to equip') : ('🪙 '+sk.cost))+'</div>'+
+      '<div class="skinCost">'+(owned ? (equippedSkin===id?'Equipped':'Tap to equip') : ('🪙 '+sk.cost.toLocaleString()))+'</div>'+
       (owned? '' : '<div class="lockIcon">🔒</div>');
     if(owned){
       card.addEventListener('click', function(){ equippedSkin = id; saveProgress(); renderHangar(); });
@@ -473,21 +547,101 @@ async function refreshLeaderboard(){
   const list = await loadLeaderboard(leaderboardKey());
   renderLeaderboard(list);
 }
+// Two players finishing at the same moment can both read-modify-write the same shared
+// leaderboard key; whoever writes second silently erases the first's entry. There's no
+// transaction/compare-and-swap primitive available here, so instead: write, then read back
+// to confirm the entry actually survived, and if it didn't (because someone else's write
+// landed in between), re-merge and try again a few times with a small random backoff.
+function entrySurvives(list, entry){
+  if(list.some(function(e){ return e.ts===entry.ts && e.name===entry.name && e.score===entry.score; })) return true;
+  // not present is also fine if the board is full and every entry legitimately outscores ours
+  if(list.length>=20 && list.every(function(e){ return e.score>=entry.score; })) return true;
+  return false;
+}
 async function submitScore(){
   const input = document.getElementById('initialsInput');
   const name = (input.value||'').trim().toUpperCase().slice(0,8) || 'GULL';
   input.value = name;
   try{ await window.storage.set('gullbomber:name', name, false); }catch(e){}
+
   const key = leaderboardKey();
-  let list = await loadLeaderboard(key);
-  list.push({name:name, score:Math.max(0,Math.floor(score)), ts:Date.now()});
-  list.sort(function(a,b){ return b.score-a.score; });
-  list = list.slice(0,20);
-  try{ await window.storage.set(key, JSON.stringify(list), true); }catch(e){}
-  renderLeaderboard(list);
+  const entry = {name:name, score:Math.max(0,Math.floor(score)), ts:Date.now()};
   const btn = document.getElementById('submitScoreBtn');
-  btn.textContent = 'Saved!';
+  btn.disabled = true; btn.textContent = 'Saving…';
+
+  let finalList = [entry];
+  let ok = false;
+  for(let attempt=0; attempt<4 && !ok; attempt++){
+    if(attempt>0){ await new Promise(function(r){ setTimeout(r, 120 + Math.random()*220); }); }
+    let list = await loadLeaderboard(key);
+    if(!list.some(function(e){ return e.ts===entry.ts && e.name===entry.name; })) list.push(entry);
+    list.sort(function(a,b){ return b.score-a.score; });
+    list = list.slice(0,20);
+    try{ await window.storage.set(key, JSON.stringify(list), true); }catch(e){}
+    const verify = await loadLeaderboard(key);
+    if(entrySurvives(verify, entry)){ ok = true; finalList = verify; }
+    else { finalList = list; }
+  }
+
+  renderLeaderboard(finalList);
+  btn.disabled = false;
+  btn.textContent = ok ? 'Saved!' : 'Saved locally';
   setTimeout(function(){ btn.textContent = 'Save'; }, 1500);
+
+  // Remember today's best Daily Challenge submission so it can be checked against the
+  // final standings once the day is actually over — see loadPendingDailyReward().
+  if(currentMode==='daily'){
+    const date = todayStr();
+    let prev = null;
+    try{ const pr = await window.storage.get('gullbomber:pendingDailyReward', false); prev = pr && pr.value ? JSON.parse(pr.value) : null; }catch(e){}
+    if(!prev || prev.date!==date || entry.score>prev.score){
+      try{ await window.storage.set('gullbomber:pendingDailyReward', JSON.stringify({date:date, name:entry.name, score:entry.score, ts:entry.ts}), false); }catch(e){}
+    }
+  }
+}
+
+// Top-10 Daily Challenge finishers get a coin bonus — but "top 10" can only be judged once
+// the day is truly over, since someone else could still out-score you later that same day.
+// So the reward isn't paid at submit time: it's checked the next time the game loads after
+// that day has rolled over, against that day's final leaderboard.
+function dailyRewardForRank(rank){
+  if(rank===1) return 500;
+  if(rank<=3) return 300;
+  if(rank<=10) return 150;
+  return 0;
+}
+function showDailyRewardToast(rank, reward, date){
+  const body = document.getElementById('drtBody');
+  if(body) body.textContent = 'You placed #'+rank+' in the '+date+' Daily Challenge — +'+reward+' coins!';
+  const el = document.getElementById('dailyRewardToast');
+  if(!el) return;
+  el.classList.add('show');
+  setTimeout(function(){ el.classList.remove('show'); }, 6000);
+}
+async function loadPendingDailyReward(){
+  let pending = null;
+  try{
+    const r = await window.storage.get('gullbomber:pendingDailyReward', false);
+    pending = r && r.value ? JSON.parse(r.value) : null;
+  }catch(e){ return; }
+  if(!pending || !pending.date) return;
+  if(pending.date === todayStr()) return; // that day isn't over yet — leave it pending
+
+  try{
+    const list = await loadLeaderboard('leaderboard:daily:'+pending.date);
+    list.sort(function(a,b){ return b.score-a.score; });
+    const idx = list.findIndex(function(e){ return e.ts===pending.ts && e.name===pending.name && e.score===pending.score; });
+    const rank = idx>=0 ? idx+1 : null;
+    const reward = rank ? dailyRewardForRank(rank) : 0;
+    if(reward>0){
+      coins += reward;
+      await saveProgress();
+      updateCoinUI();
+      renderHangar();
+      showDailyRewardToast(rank, reward, pending.date);
+    }
+  }catch(e){}
+  try{ await window.storage.set('gullbomber:pendingDailyReward', '', false); }catch(e){}
 }
 
 // ---------- bird ----------
@@ -514,25 +668,39 @@ function flap(){
 // ---------- decor (buildings / trees / beach elements) ----------
 let decorFar = [];
 let decorNear = [];
+function shadeColor(hex, amt){
+  const num = parseInt(hex.slice(1),16);
+  let r = (num>>16)+amt, g = ((num>>8)&0xFF)+amt, b = (num&0xFF)+amt;
+  r = Math.max(0,Math.min(255,r)); g = Math.max(0,Math.min(255,g)); b = Math.max(0,Math.min(255,b));
+  return '#'+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
+}
 function genDecor(arr, count, minH, maxH, spacing, colors, isBuilding){
   arr.length = 0;
   let x = -50;
   for(let i=0;i<count;i++){
     const h = minH + Math.random()*(maxH-minH);
     const w = spacing*(0.7+Math.random()*0.6);
-    const lit = Math.random()<0.35;
-    const b = {x, w, h, color: colors[Math.random()<0.5?0:1], lit};
-    if(isBuilding && lit){
-      // precompute the lit-window grid once (offsets relative to the building) instead of
-      // re-rolling random() per window every single frame — that was the main cause of
-      // the cityscape stuttering, since it ran for every lit building at 60fps.
-      b.windows = [];
+    const color = colors[Math.random()<0.5?0:1];
+    // precomputed shade variants (once per item, not per frame) so trees/palms/etc can
+    // layer lighter/darker tones for depth without recomputing color math every draw call
+    const b = {x, w, h, color, colorDark: shadeColor(color,-26), colorLight: shadeColor(color,24)};
+    if(isBuilding){
+      // Every building gets a full window grid now (precomputed once here, not re-rolled
+      // per frame — that per-frame re-roll was the original cause of the cityscape stutter).
+      // Previously only ~35% of buildings got windows at all, so most of the skyline was
+      // flat, textureless blocks — now every building is textured, with a per-window
+      // lit/dark mix instead of an all-or-nothing per-building coin flip.
+      b.windows = []; // [wx, wy, lit] triples, relative to the building's top-left
       for(let wy=14; wy<h-10; wy+=22){
         for(let wx=8; wx<w-8; wx+=16){
-          if(Math.random()<0.12) continue; // a few windows stay dark, fixed per building
-          b.windows.push(wx, wy);
+          if(Math.random()<0.08) continue; // the odd gap keeps the grid from feeling too uniform
+          b.windows.push(wx, wy, Math.random()<0.4 ? 1 : 0);
         }
       }
+      // one rooftop feature, picked once per building, so the skyline silhouette isn't just
+      // a row of flat-topped rectangles
+      const roofRoll = Math.random();
+      b.roof = roofRoll<0.22 ? 'tank' : roofRoll<0.4 ? 'antenna' : roofRoll<0.58 ? 'ac' : 'ledge';
     }
     arr.push(b);
     x += w + 14;
@@ -548,6 +716,15 @@ function regenDecor(sc){
   } else if(sc.decor==='beach'){
     genDecor(decorFar, 6, H*0.05, H*0.09, 260, sc.farColors); // distant waves/boats strip
     genDecor(decorNear, 7, H*0.1, H*0.22, 150, sc.nearColors); // palm trees
+  } else if(sc.decor==='harbour'){
+    genDecor(decorFar, 9, H*0.16, H*0.4, 105, sc.farColors, true); // dockside warehouses, windows lit
+    genDecor(decorNear, 6, H*0.3, H*0.52, 190, sc.nearColors); // gantry cranes, mixed with container stacks
+    // mix in shipping-container stacks among the cranes so the near layer isn't just
+    // identical cranes on repeat — picked once per item at generation time
+    for(const b of decorNear){ b.kind = Math.random()<0.55 ? 'crane' : 'containers'; }
+  } else if(sc.decor==='seaside'){
+    genDecor(decorFar, 10, H*0.14, H*0.3, 95, sc.farColors, true); // pastel terraced seafront houses
+    genDecor(decorNear, 7, H*0.11, H*0.15, 165, sc.nearColors); // candy-stripe beach huts along the prom
   }
 }
 
@@ -556,38 +733,254 @@ function drawDecorLayer(arr, alpha, yBase, decorType){
   ctx.globalAlpha = alpha;
   for(const b of arr){
     if(decorType==='buildings'){
+      const top = yBase - b.h;
       ctx.fillStyle = b.color;
-      ctx.fillRect(b.x, yBase-b.h, b.w, b.h+40);
-      if(b.lit && b.windows){
-        ctx.fillStyle = 'rgba(255,230,140,0.55)';
-        const top = yBase - b.h;
-        for(let i=0;i<b.windows.length;i+=2){
+      ctx.fillRect(b.x, top, b.w, b.h+40);
+      // a soft shaded strip down the right edge — the cheapest way to fake a light source
+      // and stop each building reading as a flat, paper-thin silhouette
+      ctx.fillStyle = 'rgba(0,0,0,0.14)';
+      const shadeW = Math.max(4, b.w*0.12);
+      ctx.fillRect(b.x+b.w-shadeW, top, shadeW, b.h+40);
+      if(b.windows){
+        for(let i=0;i<b.windows.length;i+=3){
+          ctx.fillStyle = b.windows[i+2] ? 'rgba(255,230,140,0.62)' : 'rgba(18,24,36,0.4)';
           ctx.fillRect(b.x + b.windows[i], top + b.windows[i+1], 7, 10);
         }
       }
-    } else if(decorType==='trees'){
-      const trunkW = Math.max(8, b.w*0.14);
-      ctx.fillStyle = '#5B4327';
-      ctx.fillRect(b.x + b.w/2 - trunkW/2, yBase-b.h*0.35, trunkW, b.h*0.35+30);
-      ctx.fillStyle = b.color;
-      ctx.beginPath();
-      ctx.ellipse(b.x+b.w/2, yBase-b.h*0.55, b.w*0.55, b.h*0.55, 0, 0, Math.PI*2);
-      ctx.fill();
-    } else if(decorType==='beach'){
-      // palm tree: curved trunk + fronds
-      ctx.strokeStyle = '#7A5A34'; ctx.lineWidth = Math.max(6,b.w*0.1); ctx.lineCap='round';
-      ctx.beginPath();
-      ctx.moveTo(b.x, yBase+20);
-      ctx.quadraticCurveTo(b.x+b.w*0.15, yBase-b.h*0.6, b.x+b.w*0.35, yBase-b.h);
-      ctx.stroke();
-      ctx.fillStyle = b.color;
-      const tipX = b.x+b.w*0.35, tipY = yBase-b.h;
-      for(let a=0;a<5;a++){
-        const ang = (a/4)*Math.PI - Math.PI*0.5;
+      // rooftop feature so the skyline isn't a row of flat-topped blocks
+      if(b.roof==='tank'){
+        ctx.fillStyle = 'rgba(35,32,30,0.55)';
+        ctx.fillRect(b.x+b.w*0.35, top-14, b.w*0.3, 12);
         ctx.beginPath();
-        ctx.ellipse(tipX+Math.cos(ang)*b.w*0.4, tipY+Math.sin(ang)*b.w*0.22, b.w*0.42, b.w*0.14, ang, 0, Math.PI*2);
+        ctx.moveTo(b.x+b.w*0.3, top-14); ctx.lineTo(b.x+b.w*0.65, top-14); ctx.lineTo(b.x+b.w*0.475, top-25);
+        ctx.closePath(); ctx.fill();
+      } else if(b.roof==='antenna'){
+        ctx.strokeStyle = 'rgba(35,32,30,0.6)'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(b.x+b.w*0.5, top); ctx.lineTo(b.x+b.w*0.5, top-24); ctx.stroke();
+        ctx.fillStyle = 'rgba(255,90,80,0.85)';
+        ctx.beginPath(); ctx.arc(b.x+b.w*0.5, top-24, 2.4, 0, Math.PI*2); ctx.fill();
+      } else if(b.roof==='ac'){
+        ctx.fillStyle = 'rgba(35,32,30,0.5)';
+        ctx.fillRect(b.x+b.w*0.18, top-8, b.w*0.18, 8);
+        ctx.fillRect(b.x+b.w*0.55, top-11, b.w*0.2, 11);
+      } else {
+        ctx.fillStyle = 'rgba(0,0,0,0.16)';
+        ctx.fillRect(b.x, top-3, b.w, 3);
+      }
+    } else if(decorType==='trees'){
+      const cx = b.x + b.w/2;
+      const trunkW = Math.max(8, b.w*0.15), trunkH = b.h*0.36+28;
+      // ground shadow first, so the tree looks planted rather than floating
+      ctx.fillStyle = 'rgba(0,0,0,0.15)';
+      ctx.beginPath(); ctx.ellipse(cx, yBase+21, b.w*0.4, 6, 0, 0, Math.PI*2); ctx.fill();
+      // two-tone trunk (a lit side + a shaded side) instead of a flat bark-colored rectangle
+      ctx.fillStyle = '#4A3620';
+      ctx.fillRect(cx-trunkW/2, yBase-trunkH+26, trunkW, trunkH);
+      ctx.fillStyle = '#6E5030';
+      ctx.fillRect(cx-trunkW/2, yBase-trunkH+26, trunkW*0.42, trunkH);
+      // layered canopy: a dark base blob for depth, several overlapping lighter clusters on
+      // top so it reads as foliage volume rather than one flat circular outline
+      const cy = yBase - b.h*0.56, cr = b.w*0.55;
+      ctx.fillStyle = b.colorDark;
+      ctx.beginPath(); ctx.ellipse(cx, cy, cr, cr*0.94, 0, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = b.color;
+      ctx.beginPath(); ctx.ellipse(cx-cr*0.34, cy-cr*0.12, cr*0.62, cr*0.58, 0, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(cx+cr*0.36, cy-cr*0.02, cr*0.56, cr*0.52, 0, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(cx, cy-cr*0.42, cr*0.5, cr*0.46, 0, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = b.colorLight;
+      ctx.beginPath(); ctx.ellipse(cx-cr*0.14, cy-cr*0.38, cr*0.3, cr*0.24, 0, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(cx+cr*0.22, cy-cr*0.2, cr*0.22, cr*0.18, 0, 0, Math.PI*2); ctx.fill();
+      // a few small texture dabs so the canopy edge isn't perfectly smooth
+      ctx.fillStyle = b.colorDark;
+      for(let d=0; d<5; d++){
+        const ang = (d/5)*Math.PI*2;
+        ctx.beginPath();
+        ctx.ellipse(cx+Math.cos(ang)*cr*0.72, cy+Math.sin(ang)*cr*0.6, cr*0.14, cr*0.1, ang, 0, Math.PI*2);
         ctx.fill();
       }
+    } else if(decorType==='beachFar'){
+      // hazy distant sailboats on the horizon — previously a flat teal ellipse hull with one
+      // plain triangle sail, which read as barely more than a colored wedge. Gave the hull an
+      // actual curved boat shape (pointed bow, flatter stern) with a waterline stripe, split
+      // the single sail into a bigger main sail + a smaller jib in front of the mast, and
+      // added a soft reflection ripple under the hull so it reads as a boat sitting on water.
+      // this whole layer renders at reduced opacity (it's the hazy background layer), which
+      // was making the sail/mast nearly invisible against the pale sky — boosted their own
+      // opacity and darkened the mast/outline so the boats stay clearly readable even faded
+      const hullY = yBase - b.h*0.25;
+      const hw = b.w*0.52, hh = b.h*0.32;
+      const bx = b.x+b.w*0.5;
+      ctx.fillStyle = b.color;
+      ctx.beginPath();
+      ctx.moveTo(bx-hw, hullY);
+      ctx.quadraticCurveTo(bx-hw*0.85, hullY+hh, bx, hullY+hh);
+      ctx.quadraticCurveTo(bx+hw*0.75, hullY+hh, bx+hw*1.05, hullY);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = 'rgba(20,20,20,0.4)'; ctx.lineWidth = 1.2;
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(bx-hw*0.65, hullY+hh*0.42); ctx.lineTo(bx+hw*0.78, hullY+hh*0.42); ctx.stroke();
+      ctx.strokeStyle = 'rgba(20,20,20,0.85)'; ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.moveTo(bx, hullY); ctx.lineTo(bx, hullY-b.h*1.9); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.95)';
+      ctx.beginPath();
+      ctx.moveTo(bx, hullY-b.h*1.85);
+      ctx.quadraticCurveTo(bx+hw*1.35, hullY-b.h*0.85, bx+hw*0.14, hullY-b.h*0.12);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = 'rgba(20,20,20,0.25)'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.82)';
+      ctx.beginPath();
+      ctx.moveTo(bx, hullY-b.h*1.25);
+      ctx.quadraticCurveTo(bx-hw*0.55, hullY-b.h*0.55, bx-hw*0.08, hullY-b.h*0.1);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = 'rgba(20,20,20,0.2)'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(bx-hw*0.55, hullY+hh+4); ctx.lineTo(bx+hw*0.7, hullY+hh+4); ctx.stroke();
+    } else if(decorType==='beach'){
+      // palm tree: a segmented, tapering trunk (thicker at the base, thin near the crown,
+      // with dark bark-ring notches) leaning into a fan of drooping, pointed fronds —
+      // rather than one uniform-width curve topped with plain blobs
+      const baseX = b.x, baseY = yBase+20, leanX = 0; // straight vertical trunk, not leaning
+      const crownX = baseX+leanX, crownY = yBase-b.h;
+      const segs = 6;
+      for(let i=0;i<segs;i++){
+        const t0=i/segs, t1=(i+1)/segs;
+        const e0=Math.pow(t0,1.15), e1=Math.pow(t1,1.15);
+        const x0=baseX+leanX*e0, y0=baseY+(crownY-baseY)*t0;
+        const x1=baseX+leanX*e1, y1=baseY+(crownY-baseY)*t1;
+        const lw = Math.max(2.5, b.w*0.17*(1-t0*0.6));
+        ctx.strokeStyle = '#8A6339'; ctx.lineWidth = lw; ctx.lineCap='round';
+        ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke();
+        ctx.strokeStyle = 'rgba(0,0,0,0.22)'; ctx.lineWidth = Math.max(1,lw*0.22);
+        ctx.beginPath(); ctx.moveTo(x0,y0+1.5); ctx.lineTo(x1,y1+1.5); ctx.stroke();
+      }
+      // fronds: previously thin, dead-straight spikes fanned out flat from the crown — read
+      // more like a starburst/asterisk than an actual palm. Reworked so each frond has real
+      // width that tapers to a point (not a hairline), arches up and away from the crown
+      // before curving down, with the outer fronds drooping well past horizontal (the classic
+      // "spider" palm silhouette the straight fan never had), plus a center rib and a few
+      // small angled leaflet ticks along it for a feathered texture instead of a flat blob.
+      const frondCount = 6;
+      for(let f=0; f<frondCount; f++){
+        const t = f/(frondCount-1); // 0..1 across the fan
+        const ang = -Math.PI*0.86 + t*Math.PI*0.72; // spread across the top, left to right
+        const side = t-0.5; // -0.5..0.5, distance from center
+        const len = b.w*(1.0 - Math.abs(side)*0.28);
+        // outer fronds droop well past horizontal; center fronds stay mostly upright
+        const droop = Math.pow(Math.abs(side)*2, 1.3) * b.w*0.72;
+        const tipX = crownX + Math.cos(ang)*len;
+        const tipY = crownY + Math.sin(ang)*len*0.3 + droop;
+        // the arch control point sits ABOVE the straight crown-to-tip line, giving the frond
+        // a graceful upward curve before it droops, instead of a dead-straight spike
+        const archX = crownX + Math.cos(ang)*len*0.55;
+        const archY = crownY + Math.sin(ang)*len*0.15 - b.w*0.22;
+        const baseW = b.w*0.13;
+        const perpX = -Math.sin(ang), perpY = Math.cos(ang);
+        ctx.fillStyle = f%2===0 ? b.colorDark : b.color;
+        ctx.beginPath();
+        ctx.moveTo(crownX+perpX*baseW, crownY+perpY*baseW);
+        ctx.quadraticCurveTo(archX+perpX*baseW*0.3, archY+perpY*baseW*0.3, tipX, tipY);
+        ctx.quadraticCurveTo(archX-perpX*baseW*0.3, archY-perpY*baseW*0.3, crownX-perpX*baseW, crownY-perpY*baseW);
+        ctx.closePath(); ctx.fill();
+        // center rib
+        ctx.strokeStyle = 'rgba(0,0,0,0.24)'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(crownX,crownY); ctx.quadraticCurveTo(archX,archY,tipX,tipY); ctx.stroke();
+        // small feathered leaflet ticks along the rib, alternating sides
+        ctx.strokeStyle = 'rgba(0,0,0,0.16)'; ctx.lineWidth = 1;
+        for(let k=1;k<=4;k++){
+          const kt = k/5;
+          const qx = (1-kt)*(1-kt)*crownX + 2*(1-kt)*kt*archX + kt*kt*tipX;
+          const qy = (1-kt)*(1-kt)*crownY + 2*(1-kt)*kt*archY + kt*kt*tipY;
+          const tickLen = baseW*(1-kt*0.7);
+          const sgn = k%2===0 ? 1 : -1;
+          ctx.beginPath();
+          ctx.moveTo(qx, qy);
+          ctx.lineTo(qx+perpX*tickLen*sgn, qy+perpY*tickLen*sgn-2);
+          ctx.stroke();
+        }
+      }
+      // a couple of coconuts nestled under the crown
+      ctx.fillStyle = '#4A3620';
+      ctx.beginPath(); ctx.arc(crownX-4, crownY+7, 3.3, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(crownX+3, crownY+10, 3, 0, Math.PI*2); ctx.fill();
+    } else if(decorType==='cranes' && b.kind==='containers'){
+      // a low stack of two shipping containers — corrugated ridges, a door outline, and a
+      // contrasting second color — for variety against the gantry cranes on their own
+      const cW = b.w*0.92, cH = Math.max(20, b.h*0.24);
+      const c1 = b.color, c2 = b.colorDark;
+      ctx.fillStyle = c1;
+      ctx.fillRect(b.x, yBase-cH, cW, cH+28);
+      ctx.fillStyle = c2;
+      ctx.fillRect(b.x+cW*0.1, yBase-cH*2-6, cW*0.86, cH);
+      ctx.strokeStyle = 'rgba(0,0,0,0.22)'; ctx.lineWidth = 1;
+      ctx.beginPath();
+      for(let rx=6; rx<cW-4; rx+=8){ ctx.moveTo(b.x+rx, yBase-cH*2-6); ctx.lineTo(b.x+rx, yBase+22); }
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 2;
+      ctx.strokeRect(b.x+cW*0.06, yBase-cH+4, cW*0.2, cH-8);
+    } else if(decorType==='cranes'){
+      // dockside gantry crane: two support legs (uneven, for a bit of perspective), a horizontal
+      // jib along the top, a counterweight at the back, and a hanging cable+hook over the dock
+      const legW = Math.max(6, b.w*0.09);
+      ctx.fillStyle = b.color;
+      ctx.fillRect(b.x + b.w*0.08, yBase-b.h*0.72, legW, b.h*0.72+30);
+      ctx.fillRect(b.x + b.w*0.5 - legW/2, yBase-b.h, legW, b.h+30);
+      ctx.fillRect(b.x, yBase-b.h, b.w, Math.max(5, b.h*0.05));
+      ctx.fillRect(b.x-10, yBase-b.h-8, 20, 16);
+      ctx.strokeStyle = 'rgba(20,20,20,0.4)'; ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(b.x+b.w*0.82, yBase-b.h+4);
+      ctx.lineTo(b.x+b.w*0.82, yBase-b.h*0.4);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(20,20,20,0.45)';
+      ctx.fillRect(b.x+b.w*0.82-4, yBase-b.h*0.4, 8, 7);
+    } else if(decorType==='seaside'){
+      // candy-stripe beach hut: a small gable-roofed box in the item's own color, with a
+      // striped door awning, a round window, and a little pennant flag at the roof peak —
+      // the classic British-seaside-promenade look
+      const hutW = b.w*0.7, hutH = b.h*1.35;
+      const hx = b.x + (b.w-hutW)/2, hy = yBase - hutH;
+      ctx.fillStyle = 'rgba(0,0,0,0.12)';
+      ctx.beginPath(); ctx.ellipse(hx+hutW*0.5, yBase+3, hutW*0.6, 5, 0, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#F7F1E3';
+      ctx.fillRect(hx, hy, hutW, hutH);
+      ctx.fillStyle = 'rgba(0,0,0,0.08)';
+      ctx.fillRect(hx+hutW*0.8, hy, hutW*0.2, hutH);
+      const roofH = hutH*0.5, overhang = hutW*0.14;
+      ctx.beginPath();
+      ctx.moveTo(hx-overhang, hy);
+      ctx.lineTo(hx+hutW*0.5, hy-roofH);
+      ctx.lineTo(hx+hutW+overhang, hy);
+      ctx.closePath();
+      ctx.fillStyle = b.color; ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.15)'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.strokeStyle = 'rgba(50,40,30,0.6)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(hx+hutW*0.5, hy-roofH); ctx.lineTo(hx+hutW*0.5, hy-roofH-10); ctx.stroke();
+      ctx.fillStyle = b.colorDark;
+      ctx.beginPath();
+      ctx.moveTo(hx+hutW*0.5, hy-roofH-10);
+      ctx.lineTo(hx+hutW*0.5+7, hy-roofH-7);
+      ctx.lineTo(hx+hutW*0.5, hy-roofH-4);
+      ctx.closePath(); ctx.fill();
+      const doorW = hutW*0.34, doorH = hutH*0.62;
+      const dx = hx+hutW*0.5-doorW/2, dy = hy+hutH-doorH;
+      ctx.fillStyle = b.colorDark;
+      ctx.fillRect(dx, dy, doorW, doorH);
+      // little striped awning above the door
+      const awnY = dy-8, stripes = 4;
+      for(let s=0;s<stripes;s++){
+        ctx.fillStyle = s%2===0 ? b.color : '#F7F1E3';
+        ctx.beginPath();
+        ctx.moveTo(dx-2+(doorW+4)*s/stripes, awnY+8);
+        ctx.lineTo(dx-2+(doorW+4)*(s+1)/stripes, awnY+8);
+        ctx.lineTo(dx-2+(doorW+4)*(s+1)/stripes-2, awnY);
+        ctx.lineTo(dx-2+(doorW+4)*s/stripes+2, awnY);
+        ctx.closePath(); ctx.fill();
+      }
+      // round window
+      ctx.fillStyle = 'rgba(60,90,110,0.55)';
+      ctx.beginPath(); ctx.arc(hx+hutW*0.22, hy+hutH*0.3, hutW*0.09, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.2)'; ctx.lineWidth = 1; ctx.stroke();
     }
   }
   ctx.restore();
@@ -618,19 +1011,24 @@ function targetSpawnInterval(){
   const base = start + (end-start)*Math.min(1, elapsed/rampTime);
   return base + rng()*base*0.6;
 }
+const TARGET_RING_BASE = 24;
 function spawnTarget(){
-  const set = TARGET_SETS[scene.key];
-  const keys = Object.keys(set);
-  const weights = keys.map(k=> set[k].weight!=null ? set[k].weight : 25);
+  const keys = Object.keys(TARGETS);
+  const infos = keys.map(k=> TARGETS[k]);
+  const weights = keys.map(k=> TARGETS[k].weight);
+  // mix in this scene's one exclusive special (picnic table, sandcastle, etc.) alongside the
+  // 5 universal targets, at its own rarity — see SCENE_SPECIALS above
+  const special = SCENE_SPECIALS[scene.key];
+  if(special){ infos.push(special); weights.push(special.weight); }
   const total = weights.reduce((a,b)=>a+b,0);
   let r = rng()*total, idx = 0;
   for(let i=0;i<weights.length;i++){ if(r<weights[i]){idx=i;break;} r-=weights[i]; }
-  const key = keys[idx];
-  const info = set[key];
+  const info = infos[idx];
   const sizeMul = targetSizeMultiplier();
+  const ringR = TARGET_RING_BASE*info.ringMul*sizeMul;
   targets.push({
-    x: W+60, w:info.w*sizeMul, sizeMul, emoji:info.emoji, pts:info.pts, good:info.good, sparkle:!!info.sparkle,
-    sparklePhase: Math.random()*Math.PI*2
+    x: W+60, w:ringR*2.3, ringR, sizeMul, art:info.art, pts:info.pts, good:true, sparkle:!!info.sparkle,
+    sparklePhase: Math.random()*Math.PI*2, bobPhase: Math.random()*Math.PI*2
   });
 }
 
@@ -666,6 +1064,24 @@ let poops = [];
 let popups = [];
 function addPopup(x,y,text,color){ popups.push({x,y,text,color, life:1.0, vy:-40}); }
 
+// ---------- impact splats (poo landing) ----------
+// A small particle burst + expanding ring at the point of impact, so a hit/miss feels like
+// it actually landed instead of just a floating text popup — cheap (handful of tiny circles,
+// a few frames of life) and self-cleans via the life countdown, same pattern as popups.
+let splats = [];
+function addSplat(x, y, color){
+  const drops = 6 + Math.floor(Math.random()*3);
+  for(let i=0;i<drops;i++){
+    const ang = Math.random()*Math.PI - Math.PI; // upward-ish fan
+    const spd = 60 + Math.random()*90;
+    splats.push({
+      x, y, vx: Math.cos(ang)*spd, vy: Math.sin(ang)*spd*0.6 - 40,
+      life: 1, r: 2 + Math.random()*2.2, color
+    });
+  }
+  splats.push({x, y, ring:true, life:1, color});
+}
+
 // ---------- input ----------
 function pointerDown(e){
   const t = e.target;
@@ -686,6 +1102,28 @@ function firePooKeyboard(){
 
 const pooBtn = document.getElementById('pooBtn');
 const readyToast = document.getElementById('readyToast');
+const reticleHint = document.getElementById('reticleHint');
+function dismissReticleHint(){
+  if(reticleHintTimer){ clearTimeout(reticleHintTimer); reticleHintTimer = null; }
+  reticleHint.classList.remove('show');
+}
+// Shown once, ever, on a genuinely new player's first run — a brief nudge toward the aiming
+// reticle, then it's marked seen (persisted) and never appears again, including on every
+// subsequent run this same session. Deliberately not repeated: this game is meant to be
+// replayed constantly, and a returning-player hint would just get in the way.
+// Note: "seen" is only recorded once the hint actually becomes visible, not when it's
+// scheduled — a first-timer who dies (falls with no input) inside the initial delay would
+// otherwise lose the hint forever without ever having seen it.
+function maybeShowReticleHint(){
+  if(seenReticleHint) return;
+  setTimeout(function(){
+    if(state!=='playing' || seenReticleHint) return;
+    seenReticleHint = true;
+    try{ window.storage.set('gullbomber:seenReticleHint', '1', false); }catch(e){}
+    reticleHint.classList.add('show');
+    reticleHintTimer = setTimeout(dismissReticleHint, 5000);
+  }, 900);
+}
 function firePoo(e){
   if(e) e.stopPropagation();
   if(state!=='playing') return;
@@ -693,6 +1131,7 @@ function firePoo(e){
   pooCharge = 0;
   toastShown = false;
   readyToast.classList.remove('show');
+  dismissReticleHint();
   poops.push({x:bird.x+10, y:bird.y+6, vx:0, vy:POO_VY0});
 }
 pooBtn.addEventListener('mousedown', firePoo);
@@ -732,7 +1171,7 @@ function startGame(mode){
   elapsed = 0;
   worldSpeed = 190;
   toastShown = false;
-  targets = []; obstacles = []; foods = []; poops = []; popups = []; trail = [];
+  targets = []; obstacles = []; foods = []; poops = []; popups = []; splats = []; trail = [];
   targetTimer = 0.5; obstacleTimer = 2.5; foodTimer = 0.6;
   sceneIndex = 0; scene = SCENES[0];
   rng = (currentMode==='daily') ? mulberry32(seedFromString('gullbomber-'+todayStr())) : Math.random;
@@ -744,12 +1183,16 @@ function startGame(mode){
   overOverlay.classList.add('hidden');
   hangarOverlay.classList.add('hidden');
   readyToast.classList.remove('show');
+  dismissReticleHint();
   showBanner(currentMode==='daily' ? '📅 Daily Challenge' : scene.name);
+  maybeShowReticleHint();
   updateHUD();
 }
 
 async function endGame(){
   state = 'over';
+  screenShake = SHAKE_DURATION;
+  dismissReticleHint();
   const finalScore = Math.max(0, Math.floor(score));
 
   let isNewBest = false;
@@ -819,18 +1262,75 @@ function targetAt(x){
   for(const t of targets){ if(x > t.x - t.w/2 && x < t.x + t.w/2) return t; }
   return null;
 }
+// Targets keep scrolling left (worldSpeed) for the ~1s the poo is in the air, so a target
+// sitting under the reticle right now will have drifted out from under it by the time the
+// poo actually lands — and a target further right can drift into the landing spot instead.
+// The reticle's ring position (a fixed screen x, since the bird doesn't move horizontally
+// and poo falls straight down) was always accurate, but the "+90 / MISS" preview was
+// checking targets' CURRENT position instead of where they'll actually be at landing time,
+// so the callout could promise a hit that had already scrolled away — this is what makes
+// the preview line up with what actually happens when the poo lands.
+function targetAtLanding(x, t){
+  for(const tg of targets){
+    const futureX = tg.x - worldSpeed*t;
+    if(x > futureX - tg.w/2 && x < futureX + tg.w/2) return tg;
+  }
+  return null;
+}
 
 // ---------- drawing ----------
+function drawCloudPuff(cx, cy, s){
+  // a single continuous bumpy outline (one closed bezier path) rather than three separate
+  // overlapping ellipses filled together — the old approach left thin triangular gaps where
+  // the ellipses' edges met but didn't fully overlap, showing tiny "holes" of sky through the
+  // cloud. One unbroken path has no internal seam for anything to show through.
+  ctx.beginPath();
+  ctx.moveTo(cx-s*1.0, cy+s*0.15);
+  ctx.bezierCurveTo(cx-s*1.35, cy-s*0.05, cx-s*1.15, cy-s*0.75, cx-s*0.5, cy-s*0.62);
+  ctx.bezierCurveTo(cx-s*0.32, cy-s*1.15, cx+s*0.4, cy-s*1.18, cx+s*0.58, cy-s*0.7);
+  ctx.bezierCurveTo(cx+s*1.25, cy-s*0.72, cx+s*1.4, cy-s*0.02, cx+s*0.92, cy+s*0.2);
+  ctx.bezierCurveTo(cx+s*1.05, cy+s*0.58, cx+s*0.45, cy+s*0.72, cx+s*0.12, cy+s*0.52);
+  ctx.bezierCurveTo(cx-s*0.28, cy+s*0.78, cx-s*0.9, cy+s*0.58, cx-s*1.0, cy+s*0.15);
+  ctx.closePath();
+  ctx.fill();
+}
 function drawSky(){
   const g = ctx.createLinearGradient(0,0,0,H);
   g.addColorStop(0, scene.skyTop);
   g.addColorStop(1, scene.skyBottom);
   ctx.fillStyle = g;
   ctx.fillRect(0,0,W,H);
+
+  // soft glowing corona behind the sun instead of one flat disc
   ctx.save();
-  ctx.globalAlpha = 0.85;
+  const sx = W*0.82, sy = H*0.16;
+  const glow = ctx.createRadialGradient(sx,sy,4, sx,sy,70);
+  glow.addColorStop(0, 'rgba(255,246,216,0.9)');
+  glow.addColorStop(0.5, 'rgba(255,246,216,0.28)');
+  glow.addColorStop(1, 'rgba(255,246,216,0)');
+  ctx.fillStyle = glow;
+  ctx.beginPath(); ctx.arc(sx, sy, 70, 0, Math.PI*2); ctx.fill();
+  ctx.globalAlpha = 0.9;
   ctx.fillStyle = '#FFF6D8';
-  ctx.beginPath(); ctx.arc(W*0.82, H*0.16, 44, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(sx, sy, 40, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+
+  // two drifting cloud layers (far, slow + near, a bit faster/bigger) — the sky used to be
+  // an empty gradient behind whatever scene decor was on screen; this gives every scene a
+  // bit of life without needing any per-scene special-casing
+  ctx.save();
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  const farSpacing = 260, farOff = (elapsed*18)%farSpacing;
+  for(let x=-farOff; x<W+80; x+=farSpacing){
+    const seed = Math.round((x+farOff)/farSpacing);
+    drawCloudPuff(x, H*0.12 + (seed%3)*H*0.05, 22);
+  }
+  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  const nearSpacing = 210, nearOff = (elapsed*34)%nearSpacing;
+  for(let x=-nearOff; x<W+100; x+=nearSpacing){
+    const seed = Math.round((x+nearOff)/nearSpacing);
+    drawCloudPuff(x, H*0.22 + (seed%3)*H*0.06, 30);
+  }
   ctx.restore();
 }
 
@@ -845,6 +1345,46 @@ function drawGround(){
     const off = (elapsed*worldSpeed*0.3)%40;
     for(let x=-off; x<W+20; x+=40){ ctx.moveTo(x,groundY+2); ctx.quadraticCurveTo(x+20,groundY+10,x+40,groundY+2); }
     ctx.stroke();
+  } else if(scene.decor==='harbour'){
+    // wooden quay decking: plank seams running back from the edge, plus mooring bollards
+    // with a slack rope between them, instead of a plain road-style dashed line — this is
+    // what actually reads as "dock" rather than just another grey street
+    ctx.strokeStyle = 'rgba(0,0,0,0.14)'; ctx.lineWidth = 2;
+    const plankSpacing = 34;
+    const plankOff = (elapsed*worldSpeed)%plankSpacing;
+    ctx.beginPath();
+    for(let x=-plankOff; x<W+20; x+=plankSpacing){ ctx.moveTo(x, groundY+6); ctx.lineTo(x-8, H); }
+    ctx.stroke();
+    const postSpacing = 140;
+    const postOff = (elapsed*worldSpeed)%postSpacing;
+    const postXs = [];
+    for(let x=-postOff; x<W+20; x+=postSpacing) postXs.push(x);
+    ctx.strokeStyle = 'rgba(40,34,26,0.5)'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    for(let i=0;i<postXs.length-1;i++){
+      const x0=postXs[i], x1=postXs[i+1];
+      ctx.moveTo(x0, groundY-10); ctx.quadraticCurveTo((x0+x1)/2, groundY-2, x1, groundY-10);
+    }
+    ctx.stroke();
+    for(const x of postXs){
+      ctx.fillStyle = '#2A2E38';
+      ctx.fillRect(x-4, groundY-18, 8, 18);
+      ctx.beginPath(); ctx.arc(x, groundY-18, 5.5, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.15)';
+      ctx.beginPath(); ctx.arc(x-1.5, groundY-19.5, 2, 0, Math.PI*2); ctx.fill();
+    }
+  } else if(scene.decor==='seaside'){
+    // painted promenade boardwalk: plank seams (no bollards/rope — that's Harbour's look)
+    // plus a painted white centre stripe, so it reads as a seafront prom rather than a road
+    ctx.strokeStyle = 'rgba(0,0,0,0.1)'; ctx.lineWidth = 2;
+    const plankSpacing = 30;
+    const plankOff = (elapsed*worldSpeed)%plankSpacing;
+    ctx.beginPath();
+    for(let x=-plankOff; x<W+20; x+=plankSpacing){ ctx.moveTo(x, groundY+4); ctx.lineTo(x, H); }
+    ctx.stroke();
+    ctx.fillStyle = scene.groundLine;
+    const off = (elapsed*worldSpeed)%40;
+    for(let x=-off; x<W; x+=40){ ctx.fillRect(x, groundY+16, 22, 3); }
   } else {
     ctx.fillStyle = scene.groundLine;
     const off = (elapsed*worldSpeed)%40;
@@ -854,29 +1394,377 @@ function drawGround(){
   ctx.fillRect(0, groundY, W, 6);
 }
 
-function drawTarget(t){
-  const cy = groundY - 20;
+// Harbour-only water backdrop: a horizontal band of water with a ripple texture and a few
+// bobbing boats, drawn BEHIND the dockside warehouses (decorFar) so it only peeks through
+// the gaps between buildings — the missing "there's actually water here" cue that made the
+// scene read as generic buildings-and-cranes instead of a harbour.
+function drawHarbourBoat(x, y, seed){
+  const hue = seed%2===0 ? '#D6483E' : '#3E7BC4';
+  ctx.fillStyle = hue;
+  ctx.beginPath();
+  ctx.moveTo(x-14, y);
+  ctx.quadraticCurveTo(x, y+7, x+14, y);
+  ctx.lineTo(x+10, y-4);
+  ctx.lineTo(x-10, y-4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(60,50,40,0.7)'; ctx.lineWidth = 1.6;
+  ctx.beginPath(); ctx.moveTo(x, y-4); ctx.lineTo(x, y-16); ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.75)';
+  ctx.beginPath(); ctx.moveTo(x, y-16); ctx.lineTo(x+8, y-9); ctx.lineTo(x, y-9); ctx.closePath(); ctx.fill();
+}
+function drawHarbourWater(yBase){
+  const bandH = 42, bandTop = yBase - bandH;
   ctx.save();
-  const fontSize = (t.emoji.length>3? 26:34) * t.sizeMul;
-  ctx.font = fontSize + 'px sans-serif';
-  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.globalAlpha = 0.85;
+  ctx.fillStyle = '#3E6B85';
+  ctx.fillRect(0, bandTop, W, bandH+30);
+  ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1.5;
+  const rippleSpacing = 34;
+  const rOff = (elapsed*worldSpeed*0.22)%rippleSpacing;
+  ctx.beginPath();
+  for(let x=-rOff; x<W+20; x+=rippleSpacing){
+    ctx.moveTo(x, bandTop+16);
+    ctx.quadraticCurveTo(x+rippleSpacing*0.25, bandTop+10, x+rippleSpacing*0.5, bandTop+16);
+    ctx.quadraticCurveTo(x+rippleSpacing*0.75, bandTop+22, x+rippleSpacing, bandTop+16);
+  }
+  ctx.stroke();
+  const boatSpacing = 150;
+  const bOff = (elapsed*worldSpeed*0.28)%boatSpacing;
+  for(let x=-bOff; x<W+40; x+=boatSpacing){
+    const seed = Math.round((x+bOff)/boatSpacing);
+    const bob = Math.sin(elapsed*1.7 + seed*2.3)*2.5;
+    drawHarbourBoat(x+30, bandTop+bandH*0.7+bob, seed);
+  }
+  ctx.restore();
+}
 
-  // solid opaque badge disc hugging the emoji — the key "obvious" visual cue
-  const ringR = fontSize*0.62;
+// Custom vector art for the 5 universal ground targets, drawn centered at the origin at
+// roughly badge-ring scale (r). Deliberately few types with real shapes, rather than the
+// old 20-plus-emoji spread — a person silhouette is reused (recolored/reposed) across
+// jogger/pram/crowd so they read as a coherent family rather than unrelated stickers.
+function drawPersonShape(r, shirt, skin, legOffset){
+  // simple walking-person silhouette: head, torso, two legs mid-stride, one swinging arm
+  const headR = r*0.22;
+  ctx.fillStyle = skin;
+  ctx.beginPath(); ctx.arc(0, -r*0.72, headR, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = shirt;
+  ctx.beginPath();
+  ctx.moveTo(-r*0.22, -r*0.5);
+  ctx.lineTo(r*0.22, -r*0.5);
+  ctx.lineTo(r*0.16, r*0.05);
+  ctx.lineTo(-r*0.16, r*0.05);
+  ctx.closePath(); ctx.fill();
+  // legs (mid-stride: one forward, one back)
+  ctx.strokeStyle = '#2A2E38'; ctx.lineWidth = r*0.13; ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(-r*0.06, r*0.02); ctx.lineTo(-r*0.06-legOffset, r*0.55);
+  ctx.moveTo(r*0.06, r*0.02); ctx.lineTo(r*0.06+legOffset, r*0.5);
+  ctx.stroke();
+  // one swinging arm
+  ctx.strokeStyle = skin; ctx.lineWidth = r*0.1;
+  ctx.beginPath(); ctx.moveTo(r*0.14,-r*0.42); ctx.lineTo(r*0.32,-r*0.1); ctx.stroke();
+}
+function drawCarArt(r){
+  const w = r*1.15, h = r*0.62, bodyY = -h*0.15;
+  ctx.fillStyle = '#D6483E';
+  ctx.beginPath();
+  ctx.moveTo(-w+6, bodyY-h*0.5);
+  ctx.lineTo(w-6, bodyY-h*0.5);
+  ctx.quadraticCurveTo(w, bodyY-h*0.5, w, bodyY-h*0.2);
+  ctx.lineTo(w, bodyY+h*0.5);
+  ctx.lineTo(-w, bodyY+h*0.5);
+  ctx.lineTo(-w, bodyY-h*0.2);
+  ctx.quadraticCurveTo(-w, bodyY-h*0.5, -w+6, bodyY-h*0.5);
+  ctx.closePath(); ctx.fill();
+  // cabin
+  ctx.fillStyle = '#B83A31';
+  ctx.beginPath();
+  ctx.moveTo(-w*0.35, bodyY-h*0.5);
+  ctx.lineTo(w*0.3, bodyY-h*0.5);
+  ctx.lineTo(w*0.15, bodyY-h*1.05);
+  ctx.lineTo(-w*0.2, bodyY-h*1.05);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = 'rgba(190,222,235,0.85)';
+  ctx.fillRect(-w*0.14, bodyY-h*0.98, w*0.4, h*0.42);
+  ctx.fillStyle = '#20242A';
+  ctx.beginPath(); ctx.arc(-w*0.55, bodyY+h*0.5, r*0.16, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(w*0.55, bodyY+h*0.5, r*0.16, 0, Math.PI*2); ctx.fill();
+}
+function drawFlashyCarArt(r){
+  // lower, wider, sportier than the plain car — racing stripe, spoiler, gold rims
+  const w = r*1.2, h = r*0.5, bodyY = -h*0.05;
+  ctx.fillStyle = '#F2C230';
+  ctx.beginPath();
+  ctx.moveTo(-w+4, bodyY-h*0.4);
+  ctx.lineTo(w-10, bodyY-h*0.4);
+  ctx.quadraticCurveTo(w, bodyY-h*0.4, w, bodyY);
+  ctx.lineTo(w-4, bodyY+h*0.55);
+  ctx.lineTo(-w, bodyY+h*0.55);
+  ctx.lineTo(-w, bodyY-h*0.1);
+  ctx.quadraticCurveTo(-w, bodyY-h*0.4, -w+4, bodyY-h*0.4);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#2A2E38';
+  ctx.fillRect(-w*0.9, bodyY-h*0.32, w*1.7, h*0.22);
+  // low sloped cabin
+  ctx.fillStyle = '#C99A1E';
+  ctx.beginPath();
+  ctx.moveTo(-w*0.3, bodyY-h*0.4);
+  ctx.lineTo(w*0.35, bodyY-h*0.4);
+  ctx.lineTo(w*0.05, bodyY-h*0.95);
+  ctx.lineTo(-w*0.1, bodyY-h*0.95);
+  ctx.closePath(); ctx.fill();
+  // spoiler
+  ctx.fillStyle = '#2A2E38';
+  ctx.fillRect(-w*1.02, bodyY-h*0.55, r*0.14, h*0.55);
+  ctx.fillRect(-w*1.05, bodyY-h*0.62, w*0.32, h*0.16);
+  ctx.fillStyle = '#20242A';
+  ctx.beginPath(); ctx.arc(-w*0.5, bodyY+h*0.55, r*0.17, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(w*0.5, bodyY+h*0.55, r*0.17, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = 'rgba(255,214,90,0.85)';
+  ctx.beginPath(); ctx.arc(-w*0.5, bodyY+h*0.55, r*0.07, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(w*0.5, bodyY+h*0.55, r*0.07, 0, Math.PI*2); ctx.fill();
+}
+function drawJoggerArt(r){
+  ctx.save(); ctx.translate(0, r*0.15);
+  drawPersonShape(r*1.35, '#2E8B77', '#F0C29A', r*0.28);
+  ctx.restore();
+}
+function drawPramArt(r){
+  // a parent figure pushing a small two-wheeled pram out in front
+  ctx.save(); ctx.translate(-r*0.18, r*0.15);
+  drawPersonShape(r*1.15, '#6C5CBF', '#EAB68C', r*0.16);
+  ctx.restore();
+  ctx.save(); ctx.translate(r*0.48, r*0.32);
+  // handle bar back to the parent's hand
+  ctx.strokeStyle = '#8A7B4E'; ctx.lineWidth = r*0.08; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(-r*0.15,-r*0.28); ctx.lineTo(r*0.1,-r*0.5); ctx.stroke();
+  // basket body
+  ctx.fillStyle = '#F2B6C6';
+  ctx.beginPath();
+  ctx.moveTo(-r*0.02,-r*0.5);
+  ctx.quadraticCurveTo(r*0.55,-r*0.55, r*0.58,-r*0.1);
+  ctx.lineTo(r*0.5, r*0.12);
+  ctx.lineTo(r*0.02, r*0.1);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.beginPath(); ctx.ellipse(r*0.28,-r*0.32, r*0.16, r*0.08, -0.3, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#3A3F4B';
+  ctx.beginPath(); ctx.arc(r*0.08, r*0.22, r*0.11, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(r*0.46, r*0.22, r*0.11, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+function drawCrowdArt(r){
+  // three reused person silhouettes at slightly different heights/colors/x-offsets
+  const people = [
+    {x:-r*0.62, scale:0.82, shirt:'#3E7BC4', skin:'#EAB68C', leg:r*0.18},
+    {x:0,        scale:1.0,  shirt:'#D6483E', skin:'#F0C29A', leg:r*0.22},
+    // deliberately not green — the badge disc behind every target is already this same
+    // green, so a green shirt here would nearly disappear against it
+    {x:r*0.62,  scale:0.88, shirt:'#C9A24B', skin:'#C88F63', leg:r*0.2},
+  ];
+  for(const p of people){
+    ctx.save();
+    ctx.translate(p.x, r*(1-p.scale)*0.5);
+    ctx.scale(p.scale, p.scale);
+    drawPersonShape(r*0.85, p.shirt, p.skin, p.leg);
+    ctx.restore();
+  }
+}
+// One-off scene-exclusive target art (see SCENE_SPECIALS) — each of these is a genuine
+// unique prop rather than a recolor of the universal 5, so every scene has one thing you
+// won't see anywhere else.
+function drawPicnicArt(r){
+  // a picnic table (planked top + benches) with three simplified seated figures around it
+  const tableW = r*1.5, tableH = r*0.5;
+  ctx.fillStyle = '#8A6339';
+  ctx.fillRect(-tableW/2, -tableH/2, tableW, tableH);
+  ctx.strokeStyle = 'rgba(0,0,0,0.22)'; ctx.lineWidth = 1;
+  ctx.beginPath();
+  for(let x=-tableW/2+6; x<tableW/2; x+=8){ ctx.moveTo(x,-tableH/2); ctx.lineTo(x,tableH/2); }
+  ctx.stroke();
+  ctx.fillStyle = '#6E4E2A';
+  ctx.fillRect(-tableW*0.44, -tableH*1.35, tableW*0.88, tableH*0.34);
+  ctx.fillRect(-tableW*0.44, tableH*1.02, tableW*0.88, tableH*0.34);
+  const people = [
+    {x:-tableW*0.26, y:-tableH*1.5, shirt:'#D6483E', skin:'#EAB68C'},
+    {x:tableW*0.14,  y:-tableH*1.5, shirt:'#3E7BC4', skin:'#F0C29A'},
+    // not green — would nearly vanish against the green badge disc behind it
+    {x:0,            y:tableH*1.5,  shirt:'#C9A24B', skin:'#C88F63'},
+  ];
+  for(const p of people){
+    ctx.fillStyle = p.skin;
+    ctx.beginPath(); ctx.arc(p.x, p.y-r*0.24, r*0.15, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = p.shirt;
+    ctx.beginPath(); ctx.ellipse(p.x, p.y, r*0.19, r*0.24, 0, 0, Math.PI*2); ctx.fill();
+  }
+}
+function drawSandcastleArt(r){
+  const baseW = r*1.3, wallTop = r*0.05;
+  ctx.fillStyle = '#E3C583';
+  ctx.fillRect(-baseW/2, wallTop, baseW, r*0.55);
+  ctx.fillStyle = '#D9B36E';
+  for(let i=0;i<5;i++){ ctx.fillRect(-baseW/2 + i*(baseW/5), wallTop-r*0.12, baseW/5*0.6, r*0.12); }
+  for(const tx of [-baseW*0.33, baseW*0.33]){
+    ctx.fillStyle = '#E3C583';
+    ctx.fillRect(tx-r*0.15, wallTop-r*0.55, r*0.3, r*0.55);
+    ctx.beginPath();
+    ctx.moveTo(tx-r*0.19, wallTop-r*0.55); ctx.lineTo(tx+r*0.19, wallTop-r*0.55); ctx.lineTo(tx, wallTop-r*0.82);
+    ctx.closePath(); ctx.fill();
+  }
+  ctx.fillStyle = 'rgba(90,60,30,0.5)';
+  ctx.beginPath(); ctx.arc(0, wallTop+r*0.55, r*0.15, Math.PI, 0); ctx.fill();
+  ctx.strokeStyle = '#5C4326'; ctx.lineWidth = 1.3;
+  ctx.beginPath(); ctx.moveTo(0, wallTop-r*0.82); ctx.lineTo(0, wallTop-r*1.02); ctx.stroke();
+  ctx.fillStyle = '#E0483E';
+  ctx.beginPath(); ctx.moveTo(0, wallTop-r*1.02); ctx.lineTo(r*0.2, wallTop-r*0.94); ctx.lineTo(0, wallTop-r*0.86); ctx.closePath(); ctx.fill();
+}
+function drawSealBuoyArt(r){
+  // mooring buoy: white body with a red band top and bottom, pushed low so it stays visible
+  // underneath the seal instead of getting fully hidden by it
+  const buoyW = r*0.62, buoyH = r*0.95, buoyY = r*0.32;
+  ctx.fillStyle = '#F5F5F0';
+  ctx.beginPath(); ctx.ellipse(0, buoyY, buoyW*0.5, buoyH*0.5, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#D6483E';
+  ctx.beginPath(); ctx.ellipse(0, buoyY-buoyH*0.3, buoyW*0.5, buoyH*0.2, 0, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0, buoyY+buoyH*0.3, buoyW*0.5, buoyH*0.2, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#B33A2E';
+  ctx.beginPath(); ctx.ellipse(0, buoyY-buoyH*0.48, buoyW*0.32, buoyH*0.12, 0, 0, Math.PI*2); ctx.fill();
+  // seal balanced on top: a body with belly shading, a clearly separate rounder head with a
+  // snout, eye and a small flipper — the earlier version was one grey blob that mostly just
+  // hid the buoy underneath it and didn't read as an animal at all
+  const bodyY = -r*0.2;
+  ctx.fillStyle = '#9BA0A8';
+  ctx.beginPath(); ctx.ellipse(0, bodyY, r*0.5, r*0.24, -0.05, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#7D828B';
+  ctx.beginPath(); ctx.ellipse(-r*0.02, bodyY+r*0.08, r*0.42, r*0.12, -0.05, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#9BA0A8';
+  ctx.beginPath(); ctx.ellipse(r*0.42, bodyY-r*0.1, r*0.2, r*0.17, 0.15, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#5C6067';
+  ctx.beginPath(); ctx.ellipse(r*0.57, bodyY-r*0.04, r*0.05, r*0.035, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#20242A';
+  ctx.beginPath(); ctx.arc(r*0.46, bodyY-r*0.16, r*0.028, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#7D828B';
+  ctx.beginPath(); ctx.ellipse(-r*0.5, bodyY+r*0.02, r*0.16, r*0.08, -0.35, 0, Math.PI*2); ctx.fill();
+}
+function drawHotdogCartArt(r){
+  const cartW = r*1.3, cartH = r*0.62, bodyY = r*0.22;
+  ctx.fillStyle = '#FFD866';
+  ctx.beginPath();
+  ctx.moveTo(-cartW*0.62, bodyY-cartH*0.5-r*0.06); ctx.lineTo(cartW*0.62, bodyY-cartH*0.5-r*0.06);
+  ctx.lineTo(cartW*0.32, bodyY-cartH*0.5-r*0.48); ctx.lineTo(-cartW*0.32, bodyY-cartH*0.5-r*0.48);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#E0483E';
+  ctx.beginPath();
+  ctx.moveTo(-cartW*0.16, bodyY-cartH*0.5-r*0.06); ctx.lineTo(cartW*0.16, bodyY-cartH*0.5-r*0.06);
+  ctx.lineTo(cartW*0.08, bodyY-cartH*0.5-r*0.48); ctx.lineTo(-cartW*0.08, bodyY-cartH*0.5-r*0.48);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = '#8A6339'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0, bodyY-cartH*0.5-r*0.06); ctx.lineTo(0, bodyY-cartH*0.5); ctx.stroke();
+  ctx.fillStyle = '#C0392B';
+  ctx.fillRect(-cartW/2, bodyY-cartH*0.5, cartW, cartH);
+  ctx.fillStyle = 'rgba(190,222,235,0.75)';
+  ctx.fillRect(-cartW*0.32, bodyY-cartH*0.22, cartW*0.64, cartH*0.42);
+  ctx.fillStyle = '#20242A';
+  ctx.beginPath(); ctx.arc(-cartW*0.28, bodyY+cartH*0.5, r*0.13, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cartW*0.28, bodyY+cartH*0.5, r*0.13, 0, Math.PI*2); ctx.fill();
+}
+function drawIceCreamVanArt(r){
+  const vanW = r*1.3, vanH = r*0.62, bodyY = r*0.2;
+  ctx.fillStyle = '#F5F0E6';
+  ctx.beginPath();
+  ctx.moveTo(-vanW*0.5, bodyY+vanH*0.5); ctx.lineTo(-vanW*0.5, bodyY-vanH*0.14);
+  ctx.lineTo(-vanW*0.26, bodyY-vanH*0.5); ctx.lineTo(vanW*0.5, bodyY-vanH*0.5);
+  ctx.lineTo(vanW*0.5, bodyY+vanH*0.5); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#7FC7E0';
+  ctx.fillRect(-vanW*0.5, bodyY+vanH*0.06, vanW, vanH*0.2);
+  ctx.fillStyle = 'rgba(190,222,235,0.85)';
+  ctx.fillRect(vanW*0.02, bodyY-vanH*0.38, vanW*0.4, vanH*0.38);
+  ctx.fillStyle = '#FFD866';
+  ctx.beginPath();
+  ctx.moveTo(-vanW*0.06, bodyY-vanH*0.5-r*0.02); ctx.lineTo(vanW*0.06, bodyY-vanH*0.5-r*0.02);
+  ctx.lineTo(0, bodyY-vanH*0.5-r*0.2); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#F5FAFF';
+  ctx.beginPath(); ctx.arc(0, bodyY-vanH*0.5-r*0.26, r*0.085, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#20242A';
+  ctx.beginPath(); ctx.arc(-vanW*0.28, bodyY+vanH*0.5, r*0.14, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(vanW*0.22, bodyY+vanH*0.5, r*0.14, 0, Math.PI*2); ctx.fill();
+}
+const TARGET_ART = {
+  car:drawCarArt, flashyCar:drawFlashyCarArt, jogger:drawJoggerArt, pram:drawPramArt, crowd:drawCrowdArt,
+  picnic:drawPicnicArt, sandcastle:drawSandcastleArt, sealBuoy:drawSealBuoyArt,
+  hotdogCart:drawHotdogCartArt, iceCreamVan:drawIceCreamVanArt
+};
+
+function drawTarget(t){
+  // a gentle idle bob so targets feel alive rather than pinned in place
+  t.bobPhase = (t.bobPhase||0) + 0.045;
+  const cy = groundY - 20 + Math.sin(t.bobPhase)*3*t.sizeMul;
+  ctx.save();
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  const ringR = t.ringR;
+
+  // soft contact shadow on the ground beneath — the single cheapest cue that these are
+  // sitting/hovering in the scene rather than pasted flat on top of it
+  ctx.globalAlpha = 0.22;
+  ctx.beginPath();
+  ctx.ellipse(t.x, groundY-2, ringR*0.85, ringR*0.28, 0, 0, Math.PI*2);
+  ctx.fillStyle = '#000';
+  ctx.fill();
   ctx.globalAlpha = 1;
+
+  // badge disc with a real light source (radial gradient) instead of a flat fill, plus a
+  // thin gold rim so it reads as a collectible coin/medallion rather than a plain circle —
+  // this is what "spruces up" every emoji target uniformly without needing bespoke art
+  // for two dozen different ground objects
+  const baseColor = t.good ? '#3FA34D' : '#E0483E';
+  const hiColor = t.good ? '#6FD37E' : '#F27A70';
+  const loColor = t.good ? '#227A32' : '#A82E24';
+  const grad = ctx.createRadialGradient(t.x-ringR*0.35, cy-ringR*0.4, ringR*0.15, t.x, cy, ringR);
+  grad.addColorStop(0, hiColor);
+  grad.addColorStop(0.6, baseColor);
+  grad.addColorStop(1, loColor);
   ctx.beginPath();
   ctx.arc(t.x, cy, ringR, 0, Math.PI*2);
-  ctx.fillStyle = t.good ? '#3FA34D' : '#E0483E';
+  ctx.fillStyle = grad;
   ctx.fill();
-  ctx.lineWidth = 2.5;
-  ctx.strokeStyle = '#1F2430';
+  ctx.lineWidth = 1.6;
+  ctx.strokeStyle = 'rgba(255,214,90,0.75)';
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(t.x, cy, ringR-2.2, 0, Math.PI*2);
+  ctx.lineWidth = 1.4;
+  ctx.strokeStyle = 'rgba(31,36,48,0.5)';
   ctx.stroke();
 
-  ctx.fillText(t.emoji, t.x, cy);
+  // custom vector art, clipped to the badge disc so nothing spills past its edge
+  ctx.save();
+  ctx.beginPath(); ctx.arc(t.x, cy, ringR-1.5, 0, Math.PI*2); ctx.clip();
+  const artFn = TARGET_ART[t.art];
+  if(artFn){
+    const scale = ringR/TARGET_RING_BASE;
+    ctx.translate(t.x, cy);
+    ctx.scale(scale, scale);
+    artFn(TARGET_RING_BASE);
+  }
+  ctx.restore();
 
-  // small badge, tucked close to the ring's edge
-  ctx.font = (12*t.sizeMul)+'px sans-serif';
-  ctx.fillText(t.good? '👍' : '⚠️', t.x + ringR*0.9, cy - ringR*0.9);
+  // points chip instead of the old generic thumbs-up badge — ties the visual directly to
+  // the score it awards, tucked at the ring's edge
+  const chipW = 8+String(t.pts).length*6.5, chipH = 13;
+  const chipX = t.x + ringR*0.62, chipY = cy - ringR*0.85;
+  ctx.beginPath();
+  ctx.moveTo(chipX-chipW/2+3, chipY-chipH/2);
+  ctx.arcTo(chipX+chipW/2, chipY-chipH/2, chipX+chipW/2, chipY+chipH/2, 3);
+  ctx.arcTo(chipX+chipW/2, chipY+chipH/2, chipX-chipW/2, chipY+chipH/2, 3);
+  ctx.arcTo(chipX-chipW/2, chipY+chipH/2, chipX-chipW/2, chipY-chipH/2, 3);
+  ctx.arcTo(chipX-chipW/2, chipY-chipH/2, chipX+chipW/2, chipY-chipH/2, 3);
+  ctx.closePath();
+  ctx.fillStyle = '#1F2430';
+  ctx.fill();
+  ctx.font = '700 10px sans-serif';
+  ctx.fillStyle = '#FFD866';
+  ctx.fillText(t.pts, chipX, chipY+1);
 
   if(t.sparkle){
     t.sparklePhase += 0.12;
@@ -889,11 +1777,116 @@ function drawTarget(t){
   ctx.restore();
 }
 
+// Custom vector art for each obstacle type, drawn at local origin (already translated to
+// o.x,o.y and rotated for bank where relevant) — replaces the old plain emoji glyph so the
+// "evil" obstacles hold their own visually against the fully hand-drawn gull, instead of
+// looking like a flat sticker next to a proper little painting.
+function drawKiteArt(r){
+  // diamond sail split into four panels (two-tone, so it reads as a real kite, not a blob),
+  // a jagged tattered edge instead of dead-straight lines, a crossed wooden spar, and a
+  // ribboned tail trailing behind (kites drift right-to-left, so the tail trails right)
+  const pts = [[0,-r*1.15],[r*0.95,0],[0,r*1.15],[-r*0.95,0]];
+  function panel(a,b,color){
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.lineTo(a[0]*0.5,a[1]*0.5);
+    // small jag partway along the edge for a torn-cloth feel
+    const jx=(a[0]+b[0])*0.28, jy=(a[1]+b[1])*0.28;
+    ctx.lineTo(jx*1.08, jy*1.08);
+    ctx.lineTo(b[0]*0.5,b[1]*0.5);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+  }
+  panel(pts[0],pts[1],'#7A0E0E');
+  panel(pts[1],pts[2],'#1B1B1F');
+  panel(pts[2],pts[3],'#7A0E0E');
+  panel(pts[3],pts[0],'#1B1B1F');
+  ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.moveTo(0,-r*1.15); ctx.lineTo(0,r*1.15); ctx.moveTo(-r*0.95,0); ctx.lineTo(r*0.95,0); ctx.stroke();
+  // spar frame
+  ctx.strokeStyle = '#5C4326'; ctx.lineWidth = 1.6;
+  ctx.beginPath(); ctx.moveTo(0,-r*1.15); ctx.lineTo(0,r*1.15); ctx.moveTo(-r*0.95,0); ctx.lineTo(r*0.95,0); ctx.stroke();
+  // ribbon tail with little bows
+  ctx.strokeStyle = '#5C4326'; ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.moveTo(0,r*1.15); ctx.quadraticCurveTo(r*0.6,r*1.6,r*0.3,r*2.1); ctx.stroke();
+  for(let i=0;i<3;i++){
+    const bx = r*0.55 - i*r*0.1, by = r*1.5 + i*r*0.35;
+    ctx.fillStyle = i%2===0 ? '#C0392B' : '#2A2E38';
+    ctx.beginPath(); ctx.ellipse(bx,by,r*0.16,r*0.09,0.5,0,Math.PI*2); ctx.fill();
+  }
+}
+function drawBirdArt(r, big){
+  // a hunched, spiky little crow-shape: dark ruffled body, jagged wing swept back, hooked beak
+  const bodyColor = '#2A2E38', darkColor = '#181A20';
+  ctx.fillStyle = bodyColor;
+  ctx.beginPath(); ctx.ellipse(0,r*0.05, r*0.85, r*0.62, 0, 0, Math.PI*2); ctx.fill();
+  // spiky ruffled crest along the back
+  ctx.fillStyle = darkColor;
+  ctx.beginPath();
+  ctx.moveTo(-r*0.5,-r*0.35);
+  for(let i=0;i<4;i++){
+    const t = i/3;
+    const x = -r*0.5 + t*r*0.9, y = -r*0.35 - (i%2===0? r*0.3 : r*0.15);
+    ctx.lineTo(x,y);
+  }
+  ctx.lineTo(r*0.4,-r*0.15);
+  ctx.closePath(); ctx.fill();
+  // swept, jagged wing (zigzag trailing edge)
+  ctx.fillStyle = darkColor;
+  ctx.beginPath();
+  ctx.moveTo(-r*0.15,-r*0.1);
+  ctx.lineTo(-r*1.15,-r*0.05);
+  ctx.lineTo(-r*0.95, r*0.15);
+  ctx.lineTo(-r*0.72, r*0.02);
+  ctx.lineTo(-r*0.55, r*0.2);
+  ctx.lineTo(-r*0.3, r*0.12);
+  ctx.closePath(); ctx.fill();
+  // hooked beak
+  ctx.fillStyle = '#D8A63C';
+  ctx.beginPath();
+  ctx.moveTo(r*0.75,-r*0.05); ctx.lineTo(r*1.15,r*0.05); ctx.lineTo(r*0.78,r*0.2); ctx.lineTo(r*0.95,r*0.08);
+  ctx.closePath(); ctx.fill();
+  if(big){
+    // eagle-only brow ridge for a fiercer look
+    ctx.strokeStyle = darkColor; ctx.lineWidth = r*0.14; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(r*0.15,-r*0.32); ctx.lineTo(r*0.55,-r*0.4); ctx.stroke();
+  }
+}
+function drawPlaneArt(r){
+  // gunmetal fuselage with a danger-red stripe, swept wings, a tail fin, and a cockpit pane —
+  // reads as a proper little menacing aircraft rather than the plain emoji glyph it replaces
+  const metal = '#4A5058', metalDark = '#2E3238', stripe = '#C0392B';
+  ctx.fillStyle = metal;
+  ctx.beginPath(); ctx.ellipse(0,0, r*1.15, r*0.42, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = stripe;
+  ctx.fillRect(-r*0.9, -r*0.08, r*1.6, r*0.16);
+  // swept wings
+  ctx.fillStyle = metalDark;
+  ctx.beginPath();
+  ctx.moveTo(-r*0.1,-r*0.1); ctx.lineTo(-r*0.75,-r*0.75); ctx.lineTo(-r*0.25,-r*0.12);
+  ctx.closePath(); ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(-r*0.1,r*0.1); ctx.lineTo(-r*0.75,r*0.75); ctx.lineTo(-r*0.25,r*0.12);
+  ctx.closePath(); ctx.fill();
+  // tail fin
+  ctx.fillStyle = metalDark;
+  ctx.beginPath();
+  ctx.moveTo(r*0.85,0); ctx.lineTo(r*1.25,-r*0.4); ctx.lineTo(r*1.05,-r*0.02);
+  ctx.closePath(); ctx.fill();
+  // cockpit pane
+  ctx.fillStyle = 'rgba(150,210,235,0.85)';
+  ctx.beginPath(); ctx.ellipse(r*0.55,-r*0.02, r*0.22, r*0.13, 0, 0, Math.PI*2); ctx.fill();
+  // engine glow at the nose
+  ctx.fillStyle = 'rgba(255,150,60,0.7)';
+  ctx.beginPath(); ctx.ellipse(-r*1.1,0, r*0.14, r*0.14, 0, 0, Math.PI*2); ctx.fill();
+}
+
 function drawObstacle(o){
   o.pulsePhase = (o.pulsePhase||0) + 0.15;
   const pulse = (Math.sin(o.pulsePhase)+1)/2; // 0..1
-  const isPlane = o.emoji==='✈️';
-  const isEagle = o.emoji==='🦅';
+  const isPlane = o.key==='plane';
+  const isEagle = o.key==='eagle';
 
   // contrail (planes only) — drawn first so it trails behind the aircraft
   if(o.contrail && o.contrail.length){
@@ -912,22 +1905,9 @@ function drawObstacle(o){
   ctx.globalAlpha = 1;
   const ringR = o.r*0.78 + pulse*2;
 
-  // jagged evil aura pulsing behind the danger disc — reads as menacing, not just "caution"
-  ctx.save();
-  ctx.translate(o.x, o.y);
-  const spikes = 9;
-  ctx.beginPath();
-  for(let i=0;i<spikes*2;i++){
-    const ang = (i/(spikes*2))*Math.PI*2;
-    const rad = (i%2===0) ? ringR*1.55 + pulse*4 : ringR*1.05;
-    ctx.lineTo(Math.cos(ang)*rad, Math.sin(ang)*rad);
-  }
-  ctx.closePath();
-  ctx.fillStyle = 'rgba(139,0,0,'+(0.35+pulse*0.25).toFixed(2)+')';
-  ctx.fill();
-  ctx.restore();
-
-  // solid, tight danger disc directly behind the glyph — keeps the emoji from washing out against the sky
+  // no red aura/glow anymore — you asked to drop it entirely so the actual obstacle art (kite/
+  // bird/eagle/plane) reads clearly with nothing behind it competing for attention. Just the
+  // tight contrast disc remains, purely so the dark art doesn't wash out against a light sky.
   ctx.beginPath();
   ctx.arc(o.x, o.y, ringR, 0, Math.PI*2);
   ctx.fillStyle = '#E0281E';
@@ -939,10 +1919,11 @@ function drawObstacle(o){
   ctx.translate(o.x, o.y);
   const bank = isPlane ? Math.max(-0.35, Math.min(0.35, (o.vy||0)*0.012)) : 0;
   ctx.rotate(bank);
-  ctx.font = (o.r*1.7)+'px sans-serif';
-  ctx.textAlign='center'; ctx.textBaseline='middle';
+  // obstacles travel right-to-left, so face them the natural way (nose/beak pointing left)
   ctx.scale(-1,1);
-  ctx.fillText(o.emoji,0,2);
+  if(o.key==='kite') drawKiteArt(o.r);
+  else if(o.key==='plane') drawPlaneArt(o.r);
+  else drawBirdArt(o.r, isEagle);
   ctx.restore();
 
   // glowing evil eyes — small menacing glint on every flying threat
@@ -984,19 +1965,38 @@ function drawObstacle(o){
 }
 
 function drawFood(f){
+  // was a flat disc + emoji with no depth cues at all — everything else (ground targets, the
+  // poo, obstacles) picked up a shadow/shine pass earlier in the project, but food got missed.
+  // Added a soft drop shadow, a subtle breathing scale pulse (reuses the existing bob phase so
+  // no new per-item state is needed), and a small glossy highlight arc for a "collectible" feel.
   const by = f.y + Math.sin(f.bob)*4;
+  const pulse = 1 + Math.sin(f.bob*1.3)*0.05;
+  const r = f.r*1.15*pulse;
   ctx.save();
   ctx.globalAlpha = 1;
+
+  // soft drop shadow, offset down-right, so the badge feels lifted off the sky behind it
+  ctx.beginPath();
+  ctx.ellipse(f.x+2, by+3, r*0.92, r*0.78, 0, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(0,0,0,0.14)';
+  ctx.fill();
+
   // solid opaque badge disc so food reads clearly against any scene
   ctx.beginPath();
-  ctx.arc(f.x, by, f.r*1.15, 0, Math.PI*2);
+  ctx.arc(f.x, by, r, 0, Math.PI*2);
   ctx.fillStyle = '#FFFDF0';
   ctx.fill();
   ctx.lineWidth = 2.5;
   ctx.strokeStyle = '#FFC93C';
   ctx.stroke();
 
-  ctx.font = (f.r*1.8)+'px sans-serif';
+  // small glossy highlight, top-left, for a bit of shine
+  ctx.beginPath();
+  ctx.ellipse(f.x-r*0.38, by-r*0.4, r*0.32, r*0.18, -0.5, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.fill();
+
+  ctx.font = (f.r*1.8*pulse)+'px sans-serif';
   ctx.textAlign='center'; ctx.textBaseline='middle';
   ctx.fillText(f.emoji, f.x, by);
   ctx.restore();
@@ -1024,7 +2024,7 @@ function drawReticle(){
   if(state!=='playing') return;
   const ready = pooCharge>=POO_MAX;
   const pred = predictLanding();
-  const target = targetAt(pred.x);
+  const target = targetAtLanding(pred.x, pred.t);
   const color = target ? (target.good ? '#3FA34D' : '#E0483E') : '#8b8578';
 
   // trajectory dots (always visible, subtle while charging)
@@ -1077,19 +2077,36 @@ function drawTrail(){
   }
 }
 
+function drawSparkle(x,y,size,alpha){
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = '#FFFFFF';
+  ctx.beginPath();
+  ctx.moveTo(x, y-size); ctx.lineTo(x+size*0.28, y-size*0.28); ctx.lineTo(x+size, y); ctx.lineTo(x+size*0.28, y+size*0.28);
+  ctx.lineTo(x, y+size); ctx.lineTo(x-size*0.28, y+size*0.28); ctx.lineTo(x-size, y); ctx.lineTo(x-size*0.28, y-size*0.28);
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+
 function drawBird(){
   const sk = SKINS[equippedSkin] || SKINS.classic;
   let bodyColor = sk.body, wingColor = sk.wing, backColor = sk.back;
-  if(sk.body==='rainbow'){
+  if(sk.special==='rainbow'){
     const hue = (elapsed*80)%360;
     bodyColor = `hsl(${hue},85%,72%)`;
     wingColor = `hsl(${(hue+30)%360},80%,62%)`;
     backColor = `hsl(${(hue+60)%360},70%,50%)`;
+  } else if(sk.special==='diamond'){
+    // slow silvery shimmer between two near-white tones, rather than a fixed flat color
+    const shimmer = (Math.sin(elapsed*2.2)+1)/2;
+    bodyColor = shimmer>0.5 ? '#FFFFFF' : '#E7F3FF';
+    wingColor = shimmer>0.5 ? '#DFF0FF' : '#C7E4FF';
   }
   ctx.save();
   ctx.translate(bird.x, bird.y);
   const tilt = Math.max(-0.5, Math.min(0.9, bird.vy/700));
   ctx.rotate(tilt);
+  if(sk.glow){ ctx.shadowColor = sk.glow; ctx.shadowBlur = 12; }
   const wingSwing = Math.sin(bird.wingPhase); // -1 (downstroke) .. 1 (upstroke)
   const wingAngle = wingSwing*0.9 - 0.15;
   ctx.save();
@@ -1109,6 +2126,16 @@ function drawBird(){
   ctx.beginPath(); ctx.arc(18,-9,2.1,0,Math.PI*2); ctx.fill();
   ctx.strokeStyle = '#FF9F1C'; ctx.lineWidth=2.5;
   ctx.beginPath(); ctx.moveTo(2,12); ctx.lineTo(2,19); ctx.lineTo(7,19); ctx.moveTo(2,19); ctx.lineTo(-3,19); ctx.stroke();
+  ctx.shadowBlur = 0;
+  if(sk.special==='diamond'){
+    // a couple of small orbiting glints — the flourish a 30,000-coin skin should have
+    for(let i=0;i<2;i++){
+      const ang = elapsed*1.6 + i*Math.PI;
+      const sx = Math.cos(ang)*26, sy = Math.sin(ang)*16 - 4;
+      const tw = (Math.sin(elapsed*5 + i*2)+1)/2;
+      drawSparkle(sx, sy, 3.5+tw*2, 0.4+tw*0.6);
+    }
+  }
   ctx.restore();
 }
 
@@ -1142,6 +2169,22 @@ function drawPopups(){
   }
 }
 
+function drawSplats(){
+  for(const s of splats){
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, s.life);
+    if(s.ring){
+      const t = 1-Math.max(0,s.life);
+      ctx.strokeStyle = s.color; ctx.lineWidth = 3*(1-t)+0.5;
+      ctx.beginPath(); ctx.ellipse(s.x, s.y, 6+t*26, 3+t*10, 0, 0, Math.PI*2); ctx.stroke();
+    } else {
+      ctx.fillStyle = s.color;
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+
 function dist(x1,y1,x2,y2){ return Math.hypot(x1-x2,y1-y2); }
 
 // ============================================================
@@ -1153,6 +2196,7 @@ function loop(now){
   if(dt>0.05) dt=0.05;
   lastT = now;
   if(state==='playing') update(dt);
+  if(screenShake>0) screenShake = Math.max(0, screenShake-dt);
   render();
   requestAnimationFrame(loop);
 }
@@ -1197,10 +2241,10 @@ function update(dt){
     const keys = allowedObstacleKeys();
     const key = keys[Math.floor(rng()*keys.length)];
     const type = OB_TYPES[key];
-    const isPlane = type.emoji==='✈️';
+    const isPlane = key==='plane';
     obstacles.push({
       x: W+50, y: 50+rng()*(groundY-160),
-      r:type.r, emoji:type.emoji, speed: worldSpeed*type.speedMul + 20,
+      r:type.r, key:key, emoji:type.emoji, speed: worldSpeed*type.speedMul + 20,
       vy: isPlane ? (rng()-0.5)*46 : 0,
       contrail: isPlane ? [] : null,
       contrailTimer: 0
@@ -1264,6 +2308,12 @@ function update(dt){
   for(const p of popups){ p.life -= dt*0.9; p.y += p.vy*dt; }
   popups = popups.filter(p=> p.life>0);
 
+  for(const s of splats){
+    s.life -= dt*2.6;
+    if(!s.ring){ s.vy += 260*dt; s.x += s.vx*dt; s.y += s.vy*dt; }
+  }
+  splats = splats.filter(s=> s.life>0);
+
   // skin trail
   const skForTrail = SKINS[equippedSkin] || SKINS.classic;
   if(skForTrail.trail){ trail.push({x:bird.x-16, y:bird.y+2, life:1}); }
@@ -1282,27 +2332,39 @@ function resolvePooHit(x){
     score += pts;
     addPopup(hit.x, groundY-50, (pts>0?'+':'')+pts, hit.good?'#3FA34D':'#E0483E');
     if(mult>1){ addPopup(hit.x, groundY-72, 'COMBO '+comboTier(comboStreak).label, '#C9A24B'); }
+    addSplat(hit.x, groundY-16, hit.good?'#7ED957':'#E0483E');
     targets = targets.filter(t=>t!==hit);
   } else {
     comboStreak = 0;
     addPopup(x, groundY-40, 'miss', '#8b8578');
+    addSplat(x, groundY-16, '#8B6F3E');
   }
 }
 
 function render(){
+  const shaking = screenShake>0;
+  if(shaking){
+    const mag = SHAKE_MAG * (screenShake/SHAKE_DURATION);
+    ctx.save();
+    ctx.translate((Math.random()*2-1)*mag, (Math.random()*2-1)*mag);
+  }
   drawSky();
-  drawDecorLayer(decorFar, 0.55, groundY-20, scene.decor);
-  drawDecorLayer(decorNear, 0.9, groundY, scene.decor);
+  if(scene.decor==='harbour') drawHarbourWater(groundY-20);
+  const farDecorType = (scene.decor==='harbour' || scene.decor==='seaside') ? 'buildings' : scene.decor==='beach' ? 'beachFar' : scene.decor;
+  drawDecorLayer(decorFar, 0.55, groundY-20, farDecorType);
+  drawDecorLayer(decorNear, 0.9, groundY, scene.decor==='harbour' ? 'cranes' : scene.decor);
   drawGround();
   for(const t of targets) drawTarget(t);
   for(const f of foods) drawFood(f);
   drawReticle();
   for(const o of obstacles) drawObstacle(o);
   for(const p of poops) drawPoop(p);
+  drawSplats();
   drawTrail();
   drawBird();
   drawComboBadge();
   drawPopups();
+  if(shaking) ctx.restore();
 }
 
 // ---------- init ----------
@@ -1314,7 +2376,7 @@ resetBird();
 regenDecor(scene);
 loadBest();
 loadDailyBest();
-loadProgress();
+loadProgress().then(loadPendingDailyReward);
 requestAnimationFrame(loop);
 
 })();
