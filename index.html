@@ -723,7 +723,17 @@ function genDecor(arr, count, minH, maxH, spacing, colors, isBuilding, gap){
   gap = gap===undefined ? 14 : gap;
   arr.length = 0;
   let x = -50;
-  for(let i=0;i<count;i++){
+  // Generate at least `count` items (the curated density each scene was designed
+  // with), but keep going past that if needed until the strip comfortably clears
+  // the current viewport width + a buffer. `count` alone was tuned assuming a
+  // phone-width screen; on a wide desktop/laptop browser window (W is literally
+  // window.innerWidth, easily 1200-1900px+), a fixed count could span LESS than
+  // the visible width - meaning wrapDecor's recycle point (moving an exited
+  // building back to the right edge of the strip) landed already on-screen
+  // instead of safely beyond the horizon, which is what read as buildings
+  // "popping up" mid-view instead of scrolling in from off-screen.
+  let i = 0;
+  while(i<count || x < W+200){
     const h = minH + Math.random()*(maxH-minH);
     const w = spacing*(0.7+Math.random()*0.6);
     const color = colors[Math.random()<0.5?0:1];
@@ -750,6 +760,7 @@ function genDecor(arr, count, minH, maxH, spacing, colors, isBuilding, gap){
     }
     arr.push(b);
     x += w + gap;
+    i++;
   }
 }
 let decorFarGap = 14, decorNearGap = 14;
