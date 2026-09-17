@@ -1,0 +1,3002 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Gull Bomber: City Strike</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1F2430;
+    --panel:#FFFDF7;
+    --poo:#8B6F3E;
+    --poo-glow:#C9A24B;
+    --good:#3FA34D;
+    --bad:#E0483E;
+    --beak:#FF9F1C;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
+  html,body{
+    margin:0; padding:0; width:100%; height:100%; overflow:hidden;
+    background:#101418; touch-action:none; overscroll-behavior:none;
+    font-family:'Nunito',sans-serif;
+  }
+  #wrap{position:fixed; inset:0; display:flex; align-items:center; justify-content:center;}
+  canvas{display:block; touch-action:none;}
+
+  .hud{position:fixed; top:0; left:0; right:0; padding:calc(10px + env(safe-area-inset-top)) 14px 0 14px; display:flex; justify-content:space-between; align-items:flex-start; pointer-events:none; z-index:5;}
+  .scoreBox{
+    background:rgba(255,253,247,0.92); border:3px solid var(--ink); border-radius:16px;
+    padding:6px 16px; font-family:'Baloo 2',sans-serif; font-weight:800; font-size:22px; color:var(--ink);
+    box-shadow:0 3px 0 var(--ink), 0 6px 14px rgba(0,0,0,0.18);
+  }
+  .scoreBox span{display:block; font-family:'Nunito'; font-size:11px; font-weight:700; letter-spacing:.08em; color:#7a7365; text-transform:uppercase; margin-top:-2px;}
+
+  #muteBtn{
+    position:fixed; top:calc(72px + env(safe-area-inset-top)); right:14px; z-index:6;
+    width:38px; height:38px; border-radius:50%; background:rgba(255,253,247,0.92); border:2.5px solid var(--ink);
+    display:flex; align-items:center; justify-content:center; font-size:18px; cursor:pointer;
+    box-shadow:0 3px 0 var(--ink); user-select:none; touch-action:manipulation;
+  }
+  #muteBtn:active{ transform:translateY(2px); box-shadow:none; }
+
+  .pooMeterWrap{
+    position:fixed; left:14px; bottom:calc(14px + env(safe-area-inset-bottom)); width:150px; z-index:5; pointer-events:none;
+  }
+  .pooLabel{font-family:'Baloo 2'; font-weight:800; font-size:13px; color:#fff; text-shadow:0 2px 0 rgba(0,0,0,.35); margin-bottom:4px; letter-spacing:.05em;}
+  .pooMeter{
+    width:100%; height:22px; background:rgba(0,0,0,.35); border-radius:11px; border:2.5px solid var(--ink); overflow:hidden;
+    box-shadow:0 3px 0 rgba(0,0,0,.25);
+  }
+  .pooMeterFill{
+    height:100%; width:0%; background:linear-gradient(90deg,var(--poo),var(--poo-glow));
+    transition:width .15s ease-out;
+  }
+  .pooMeterFill.full{ background:linear-gradient(90deg,#3FA34D,#7ED957); }
+
+  #pooBtn{
+    position:fixed; right:16px; bottom:calc(18px + env(safe-area-inset-bottom)); width:96px; height:96px; border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #a98a54, #6b5330); border:4px solid var(--ink);
+    box-shadow:0 5px 0 #4a3a22, 0 5px 14px rgba(0,0,0,.35);
+    display:flex; align-items:center; justify-content:center; font-size:38px; z-index:6;
+    opacity:.45; transform:scale(.92); transition:opacity .15s, transform .1s;
+    user-select:none;
+  }
+  #pooBtn.ready{
+    opacity:1; transform:scale(1);
+    background:radial-gradient(circle at 35% 30%, var(--poo-glow), var(--poo));
+    animation:pulse 0.9s ease-in-out infinite;
+  }
+  #pooBtn.ready:active{transform:scale(.9);}
+  #pooBtn.kbdPulse{ transform:scale(.88); }
+  @keyframes pulse{
+    0%,100%{ box-shadow:0 5px 0 #4a3a22, 0 5px 14px rgba(0,0,0,.35), 0 0 0 0 rgba(126,217,87,.55);}
+    50%{ box-shadow:0 5px 0 #4a3a22, 0 5px 14px rgba(0,0,0,.35), 0 0 0 14px rgba(126,217,87,0);}
+  }
+
+  #desktopHint{
+    position:fixed; left:50%; bottom:calc(14px + env(safe-area-inset-bottom)); transform:translateX(-50%);
+    z-index:5; display:none; align-items:center; gap:14px; pointer-events:none;
+    background:rgba(31,36,48,0.55); border:1.5px solid rgba(255,255,255,0.25); border-radius:999px;
+    padding:6px 16px; font-family:'Nunito'; font-weight:700; font-size:12px; color:#fff; letter-spacing:.02em;
+    backdrop-filter: blur(3px);
+  }
+  #desktopHint kbd{
+    background:rgba(255,255,255,0.18); border:1px solid rgba(255,255,255,0.35); border-radius:5px;
+    padding:1px 7px; font-family:'Baloo 2'; font-weight:700; font-size:11px; margin-right:5px;
+  }
+  body.is-desktop #desktopHint{ display:flex; }
+
+  #vignette{
+    position:fixed; inset:0; pointer-events:none; z-index:4;
+    box-shadow: inset 0 0 60px rgba(0,0,0,0.14);
+  }
+
+  #readyToast{
+    position:fixed; left:50%; top:22%; transform:translate(-50%,-10px); z-index:7;
+    font-family:'Baloo 2'; font-weight:800; font-size:20px; color:#fff; text-align:center;
+    background:rgba(63,163,77,0.95); border:3px solid var(--ink); border-radius:14px; padding:8px 18px;
+    box-shadow:0 4px 0 var(--ink); opacity:0; pointer-events:none; transition:opacity .25s, transform .25s;
+    white-space:nowrap;
+  }
+  #readyToast.show{ opacity:1; transform:translate(-50%,0); }
+
+  #sceneBanner{
+    position:fixed; left:50%; top:16%; transform:translate(-50%,-30px); z-index:7;
+    font-family:'Baloo 2'; font-weight:800; font-size:24px; color:#fff; text-align:center;
+    background:rgba(31,36,48,0.85); border:3px solid #fff; border-radius:14px; padding:10px 22px;
+    box-shadow:0 4px 0 rgba(0,0,0,.4); opacity:0; pointer-events:none; transition:opacity .35s, transform .35s;
+  }
+  #sceneBanner.show{ opacity:1; transform:translate(-50%,0); }
+
+  /* shown once a completed Daily Challenge day's final results are in and a bonus was earned */
+  #dailyRewardToast{
+    position:fixed; left:50%; top:9%; transform:translate(-50%,-14px); z-index:9;
+    max-width:280px; text-align:center; pointer-events:none;
+    background:linear-gradient(135deg,#FFF3CE,#FFE0A0); border:3px solid var(--ink); border-radius:16px;
+    padding:10px 18px; box-shadow:0 5px 0 var(--ink), 0 8px 18px rgba(0,0,0,.25);
+    opacity:0; transition:opacity .4s, transform .4s;
+  }
+  #dailyRewardToast.show{ opacity:1; transform:translate(-50%,0); }
+  #dailyRewardToast .drtTitle{ font-family:'Baloo 2'; font-weight:800; font-size:15px; color:var(--ink); }
+  #dailyRewardToast .drtBody{ font-family:'Nunito'; font-weight:700; font-size:13px; color:#6b5518; margin-top:2px; }
+
+  /* one-time reticle callout — shown on the player's very first run only, never again */
+  #reticleHint{
+    position:fixed; left:min(150px, 30vw); bottom:calc(148px + env(safe-area-inset-bottom));
+    z-index:7; max-width:180px; pointer-events:none;
+    font-family:'Nunito'; font-weight:800; font-size:12.5px; line-height:1.3; color:#fff; text-align:left;
+    background:rgba(31,36,48,0.88); border:2.5px solid #fff; border-radius:12px; padding:8px 10px;
+    opacity:0; transform:translateY(6px); transition:opacity .3s, transform .3s;
+  }
+  #reticleHint.show{ opacity:1; transform:translateY(0); }
+  #reticleHint .arrow{
+    position:absolute; left:16px; bottom:-9px; width:0; height:0;
+    border-left:8px solid transparent; border-right:8px solid transparent; border-top:9px solid #fff;
+  }
+  #reticleHint .arrow::after{
+    content:""; position:absolute; left:-6px; top:-9px; width:0; height:0;
+    border-left:6px solid transparent; border-right:6px solid transparent; border-top:7px solid rgba(31,36,48,0.88);
+  }
+
+  .overlay{
+    position:fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:20;
+    background:rgba(20,24,20,.55); backdrop-filter: blur(2px); touch-action:manipulation;
+  }
+  .card{
+    background:var(--panel); border:4px solid var(--ink); border-radius:22px; padding:24px 26px 22px;
+    width:min(360px, 88vw); text-align:center; box-shadow:0 8px 0 var(--ink); max-height:90vh; overflow-y:auto;
+    -webkit-overflow-scrolling:touch; touch-action:pan-y;
+  }
+  .card h1{
+    font-family:'Baloo 2'; font-size:30px; margin:0 0 2px; color:var(--ink); line-height:1.05;
+  }
+  .card h1 .accent{color:var(--beak);}
+  .card p.sub{margin:0 0 14px; font-size:13px; color:#6b6558; font-weight:700; text-transform:uppercase; letter-spacing:.06em;}
+  .rules{text-align:left; font-size:14px; line-height:1.5; margin:12px 0; color:#33302a; font-weight:600;}
+  .rules div{margin-bottom:5px; display:flex; align-items:flex-start; gap:6px;}
+  .legend{display:flex; gap:10px; justify-content:center; margin:14px 0 6px; flex-wrap:wrap;}
+  .legendItem{display:flex; align-items:center; gap:6px; font-family:'Baloo 2'; font-weight:700; font-size:13px;}
+  .dot{width:14px; height:14px; border-radius:50%; display:inline-block; box-shadow:0 0 0 3px rgba(0,0,0,0.06) inset;}
+  .dot.good{background:var(--good);}
+  .dot.bad{background:var(--bad);}
+  .btn{
+    font-family:'Baloo 2'; font-weight:800; font-size:19px; color:#fff; background:var(--good);
+    border:3px solid var(--ink); border-radius:14px; padding:11px 22px; margin-top:10px; cursor:pointer;
+    box-shadow:0 4px 0 #1f6b2c; width:100%; touch-action:manipulation;
+  }
+  .btn:active{transform:translateY(3px); box-shadow:none;}
+  .scoreLine{font-family:'Baloo 2'; font-size:17px; margin:3px 0; color:var(--ink);}
+  .scoreLine b{font-size:26px; display:block; color:var(--bad);}
+
+  .topBar{display:flex; justify-content:center; margin:-2px 0 12px;}
+  .coinPill{
+    display:flex; align-items:center; gap:5px; background:#FFF3CE; border:2.5px solid var(--ink); border-radius:999px;
+    padding:5px 14px; font-family:'Baloo 2'; font-weight:800; font-size:15px; color:#7A5A0A;
+  }
+  .modeRow{display:flex; gap:10px; margin-top:6px;}
+  .modeBtn{
+    flex:1; font-family:'Baloo 2'; font-weight:800; font-size:14.5px; color:#fff;
+    border:3px solid var(--ink); border-radius:14px; padding:11px 6px; cursor:pointer; touch-action:manipulation;
+  }
+  .modeBtn.endless{ background:var(--good); box-shadow:0 4px 0 #1f6b2c; }
+  .modeBtn.daily{ background:#3E7BC4; box-shadow:0 4px 0 #244B78; }
+  .modeBtn:active{ transform:translateY(3px); box-shadow:none; }
+  .ghostBtn{
+    font-family:'Baloo 2'; font-weight:700; font-size:14px; color:var(--ink); background:transparent;
+    border:2.5px dashed #b7ae9a; border-radius:12px; padding:9px 14px; margin-top:10px; cursor:pointer; width:100%;
+    touch-action:manipulation;
+  }
+  .ghostBtn:active{ transform:scale(.98); }
+
+  .skinGrid{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:14px 0;}
+  .skinCard{
+    border:3px solid var(--ink); border-radius:14px; padding:10px 8px; text-align:center; cursor:pointer;
+    background:#fff; position:relative; touch-action:manipulation;
+  }
+  .skinCard.locked{ opacity:.5; cursor:default; }
+  .skinCard.equipped{ outline:3px solid var(--good); outline-offset:2px; }
+  .skinCard .swatch{ width:42px; height:42px; border-radius:50%; margin:0 auto 6px; border:2.5px solid var(--ink); }
+  .skinCard .skinName{ font-family:'Baloo 2'; font-weight:800; font-size:12.5px; }
+  .skinCard .skinCost{ font-family:'Nunito'; font-size:11px; font-weight:700; color:#7a7365; margin-top:2px; }
+  .skinCard .lockIcon{ position:absolute; top:6px; right:8px; font-size:13px; }
+
+  .lbSection{ margin-top:14px; padding-top:14px; border-top:2px dashed #ddd6c4; text-align:left; }
+  .lbTitle{ font-family:'Baloo 2'; font-weight:800; font-size:15px; margin-bottom:6px; text-align:center; }
+  .lbNote{ font-size:10.5px; color:#9c9484; text-align:center; margin-bottom:8px; font-weight:600; }
+  .lbRow{ display:flex; justify-content:space-between; font-family:'Nunito'; font-weight:700; font-size:14px; padding:3px 6px; }
+  .entryRow{ display:flex; gap:8px; margin:0 0 10px; }
+  .entryRow input{
+    flex:1; min-width:0; border:2.5px solid var(--ink); border-radius:10px; padding:8px; font-family:'Baloo 2';
+    font-weight:800; font-size:15px; text-align:center; text-transform:uppercase; touch-action:manipulation;
+  }
+  .entryRow button{
+    font-family:'Baloo 2'; font-weight:800; color:#fff; background:var(--good); border:2.5px solid var(--ink);
+    border-radius:10px; padding:0 16px; cursor:pointer; touch-action:manipulation;
+  }
+  .unlockToast{
+    background:#FFF3CE; border:2.5px solid #C9A24B; border-radius:12px; padding:8px 10px; margin:8px 0;
+    font-family:'Baloo 2'; font-weight:700; font-size:13px; color:#7A5A0A; text-align:center;
+  }
+  .coinsEarned{ font-family:'Baloo 2'; font-weight:800; font-size:15px; color:#C9A24B; margin:2px 0 4px; }
+  .hidden{display:none !important;}
+</style>
+</head>
+<body>
+<div id="vignette"></div>
+<div id="wrap"><canvas id="game"></canvas></div>
+
+<div class="hud">
+  <div class="scoreBox"><span>SCORE</span><div id="scoreVal">0</div></div>
+  <div class="scoreBox"><span id="bestLabel">BEST</span><div id="bestVal">0</div></div>
+</div>
+
+<div id="muteBtn">🔊</div>
+
+<div class="pooMeterWrap">
+  <div class="pooLabel">💩 POO METER</div>
+  <div class="pooMeter"><div class="pooMeterFill" id="pooFill"></div></div>
+</div>
+
+<div id="readyToast">💩 LOCKED ON, FIRE!</div>
+<div id="reticleHint">That glowing ring shows exactly where your poo will land<span class="arrow"></span></div>
+<div id="dailyRewardToast"><div class="drtTitle">🏆 Daily Challenge results are in!</div><div class="drtBody" id="drtBody"></div></div>
+<div id="sceneBanner"></div>
+
+<div id="pooBtn">💩</div>
+<div id="desktopHint"><span><kbd>SPACE</kbd>flap</span><span><kbd>ENTER</kbd>poo</span></div>
+
+<div class="overlay" id="startOverlay">
+  <div class="card">
+    <h1>GULL <span class="accent">BOMBER</span></h1>
+    <p class="sub">City Strike</p>
+    <div class="topBar"><div class="coinPill">🪙 <span id="coinVal">0</span></div></div>
+    <div class="rules">
+      <div>🐦 <span>Tap / click the sky to <b>flap</b></span></div>
+      <div>🐟 <span>Fly through food to charge your poo meter</span></div>
+      <div>🎯 <span>Watch the glowing reticle below your gull, it shows exactly where your poo will land</span></div>
+      <div>💩 <span>Tap the poo button (or hit <b>ENTER</b> on desktop) once it's <b>green &amp; pulsing</b></span></div>
+      <div>🐦🍦 <span>Small targets pay out big, large groups pay out small. Everything on the ground is fair game!</span></div>
+      <div>🗺️ <span>The scenery changes the longer you fly: city, park, beach and beyond</span></div>
+      <div>🏆 <span>Finish top 10 in Daily Challenge for bonus coins, paid out next time you play once that day's results are final</span></div>
+    </div>
+    <div class="legend">
+      <div class="legendItem"><span class="dot good"></span> Smaller = bigger score</div>
+    </div>
+    <div class="modeRow">
+      <button class="modeBtn endless" id="startEndlessBtn">🕊️ Free Flight</button>
+      <button class="modeBtn daily" id="startDailyBtn">📅 Daily Challenge</button>
+    </div>
+    <button class="ghostBtn" id="hangarBtn">🎨 Hangar: skins &amp; unlocks</button>
+  </div>
+</div>
+
+<div class="overlay hidden" id="overOverlay">
+  <div class="card">
+    <h1>SPLAT!</h1>
+    <p class="sub">Flight over</p>
+    <div class="scoreLine">Score<b id="finalScore">0</b></div>
+    <div class="scoreLine" id="newBestLine" style="display:none; color:var(--good);">🏆 New best!</div>
+    <div class="coinsEarned" id="coinsEarnedLine"></div>
+    <div id="unlockToast" class="unlockToast hidden"></div>
+    <div class="lbSection">
+      <div class="lbTitle" id="lbTitle">🏆 Leaderboard</div>
+      <div class="lbNote">Your name &amp; score are visible to everyone who plays this</div>
+      <div class="entryRow">
+        <input id="initialsInput" maxlength="8" placeholder="YOUR NAME">
+        <button id="submitScoreBtn">Save</button>
+      </div>
+      <div id="lbList"></div>
+    </div>
+    <button class="btn" id="restartBtn">Fly Again</button>
+    <button class="ghostBtn" id="backToMenuBtn">Back to Menu</button>
+  </div>
+</div>
+
+<div class="overlay hidden" id="hangarOverlay">
+  <div class="card">
+    <h1>🎨 HANGAR</h1>
+    <p class="sub">Pick your gull</p>
+    <div class="topBar"><div class="coinPill">🪙 <span id="coinValHangar">0</span></div></div>
+    <div class="skinGrid" id="skinGrid"></div>
+    <button class="btn" id="closeHangarBtn">Done</button>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+// ==========================================================================
+// ---------- PERSISTENCE ----------
+// `window.storage` was Claude.ai's Artifacts-only sandbox API - it doesn't
+// exist in a real Capacitor/Android build, so every save/load would silently
+// no-op there. This Store shim has the exact same get/set(key, shared)
+// signature, backed by real localStorage, so every call site below needed
+// zero changes beyond the object name.
+//
+// IMPORTANT - leaderboard TODO: calls made with shared=true are the online
+// leaderboard (see loadLeaderboard/submitScore below). Right now they're
+// still just local to this device (namespaced under 'shared:' so they're
+// easy to grep for) - that's a placeholder, not a real shared leaderboard.
+// Once Google Play Games Services is set up in the Play Console, replace the
+// body of Store.get/Store.set's `if(shared)` branch with real
+// PlayGames.submitScore() / leaderboard-read calls - every call site that
+// uses shared=true stays exactly as-is.
+// ==========================================================================
+const Store = {
+  async get(key, shared){
+    try{
+      const v = localStorage.getItem((shared?'shared:':'')+key);
+      return v===null ? null : {key, value:v, shared:!!shared};
+    }catch(e){ return null; }
+  },
+  async set(key, value, shared){
+    try{
+      localStorage.setItem((shared?'shared:':'')+key, value);
+      return {key, value, shared:!!shared};
+    }catch(e){ return null; }
+  }
+};
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+let W, H, DPR;
+function resize(){
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = W*DPR; canvas.height = H*DPR;
+  canvas.style.width = W+'px'; canvas.style.height = H+'px';
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  groundY = H - 96;
+}
+window.addEventListener('resize', resize);
+
+// ============================================================
+// SCENES
+// ============================================================
+const SCENE_DURATION = 32; // seconds per scene before cycling to next
+
+const SCENES = [
+  {
+    key:'city', name:'🏙️ Rolling City',
+    skyTop:'#4FB8E0', skyBottom:'#D8F3F8',
+    groundColor:'#4A5568', groundLine:'rgba(255,255,255,0.12)',
+    decor:'buildings',
+    farColors:['#37506B','#2E4459'], nearColors:['#233144','#1B2536']
+  },
+  {
+    key:'park', name:'🌳 City Park',
+    skyTop:'#7FD1E0', skyBottom:'#EAF8E8',
+    groundColor:'#5C9E52', groundLine:'rgba(255,255,255,0.18)',
+    decor:'trees',
+    farColors:['#3E7A3B','#356A33'], nearColors:['#2E5F2C','#255024']
+  },
+  {
+    key:'beach', name:'🏖️ Sunny Beach',
+    skyTop:'#5AC7E8', skyBottom:'#FFF3D6',
+    groundColor:'#E3C583', groundLine:'rgba(255,255,255,0.35)',
+    decor:'beach',
+    // farColors: teal, used for the hazy distant-boats horizon strip. nearColors: actual
+    // palm-frond greens for the foreground palm trees — these used to be sandy/khaki tones
+    // left over from an earlier design, which was a big part of why the palms didn't read
+    // as palms at all (green fronds matter more than the trunk/frond shape does).
+    farColors:['#1F8FA8','#1B7C92'], nearColors:['#3E8E52','#2E7A45']
+  },
+  {
+    key:'harbour', name:'⚓ Fishing Harbour',
+    skyTop:'#7FAFC9', skyBottom:'#E9EEF0',
+    groundColor:'#5B6670', groundLine:'rgba(255,255,255,0.16)',
+    decor:'harbour',
+    farColors:['#4A5A66','#3E4C57'], nearColors:['#9A8E78','#7C7263']
+  },
+  {
+    key:'seaside', name:'🏘️ Seaside Town',
+    skyTop:'#8FD3E8', skyBottom:'#FDEBD3',
+    groundColor:'#C9B896', groundLine:'rgba(255,255,255,0.3)',
+    decor:'seaside',
+    // farColors: pastel terraced seafront houses (reuses the shared 'buildings' renderer,
+    // just retinted — the same trick already used for Harbour's warehouses and, previously,
+    // Car Park's supermarket block). nearColors: the candy-stripe beach huts along the prom.
+    farColors:['#E7A6C4','#8FC7DE'], nearColors:['#E85D5D','#3E7BC4']
+  }
+];
+
+// Ground targets used to be a different set of 4 emoji per scene (20+ types total spread
+// thin). Consolidated down to 5 universal, custom-drawn targets reused in every scene —
+// fewer variations, but each one gets real vector art (see the draw*Art functions below)
+// instead of a plain emoji glyph. ringMul controls the badge size per type; good/small/rare
+// still pays out more than common/large, same balance philosophy as before.
+const TARGETS = {
+  car:      {art:'car',       pts:90, ringMul:0.86, weight:16},
+  flashyCar:{art:'flashyCar', pts:60, ringMul:1.0,  weight:20, sparkle:true},
+  jogger:   {art:'jogger',    pts:45, ringMul:0.6,  weight:26},
+  pram:     {art:'pram',      pts:35, ringMul:0.78, weight:22},
+  crowd:    {art:'crowd',     pts:20, ringMul:1.18, weight:30},
+};
+
+// One extra, scene-exclusive target per scene — mixed into the same spawn pool as the 5
+// universal targets above (see spawnTarget()) rather than replacing them, so each scene
+// keeps a little of its own identity without going back to "20 mediocre types." Weighted
+// about as rare as the rarest universal target (car, weight 16) so finding one feels like a
+// small bonus, and priced generously (with a sparkle) to reward it.
+const SCENE_SPECIALS = {
+  city:    {art:'hotdogCart', pts:110, ringMul:1.05, weight:15, sparkle:true},
+  park:    {art:'picnic',     pts:100, ringMul:1.15, weight:15, sparkle:true},
+  beach:   {art:'sandcastle', pts:95,  ringMul:1.0,  weight:15, sparkle:true},
+  harbour: {art:'sealBuoy',   pts:100, ringMul:0.95, weight:15, sparkle:true},
+  // reuses the iceCreamVan art originally built for the since-removed Car Park scene — it
+  // was sitting unused, and an ice cream van is arguably a better fit for a seafront prom
+  // than it ever was for a car park
+  seaside: {art:'iceCreamVan',pts:105, ringMul:1.1,  weight:15, sparkle:true},
+};
+
+let sceneIndex = -1;
+let scene = SCENES[0];
+
+// ---------- state ----------
+let state = 'start'; // start | playing | over
+let score = 0;
+let best = 0;
+let pooCharge = 0;
+const POO_MAX = 100;
+let screenShake = 0; // seconds remaining on the death shake
+const SHAKE_DURATION = 0.4, SHAKE_MAG = 16;
+let seenReticleHint = true; // safe default — stays quiet until loadProgress() confirms a genuinely new player
+let reticleHintTimer = null;
+let comboStreak = 0; // consecutive poo hits with no miss in between
+// Tiered so a long streak is worth chasing but can't inflate the score without limit —
+// the multiplier plateaus at 1.75x no matter how long the streak runs.
+const COMBO_TIERS = [ {min:7, mult:1.75, label:'1.75×'}, {min:4, mult:1.5, label:'1.5×'}, {min:2, mult:1.25, label:'1.25×'} ];
+function comboTier(streak){
+  for(const tier of COMBO_TIERS){ if(streak>=tier.min) return tier; }
+  return null;
+}
+function comboMultiplier(streak){
+  const tier = comboTier(streak);
+  return tier ? tier.mult : 1;
+}
+let groundY = 0;
+let worldSpeed = 190;
+let elapsed = 0;
+let toastShown = false;
+
+async function loadBest(){
+  try{
+    const r = await Store.get('gullbomber:best', false);
+    if(r && r.value){ best = parseInt(r.value)||0; document.getElementById('bestVal').textContent = best; }
+  }catch(e){}
+}
+async function saveBest(){
+  try{ await Store.set('gullbomber:best', String(best), false); }catch(e){}
+}
+
+// ---------- skins & lifetime progress ----------
+const SKINS = {
+  classic: {name:'Classic Gull', cost:0,     body:'#FFFFFF', wing:'#E9EDF2', back:'#B9C2CC', trail:null},
+  golden:  {name:'Golden Gull',  cost:150,   body:'#FFE9A8', wing:'#FFD866', back:'#E8B93E', trail:'#FFD866'},
+  sky:     {name:'Sky Gull',     cost:250,   body:'#DCF3FF', wing:'#AEE3FF', back:'#6FBFE0', trail:'#8FE0FF'},
+  shadow:  {name:'Shadow Gull',  cost:350,   body:'#3A3F4B', wing:'#2A2E38', back:'#1C1F26', trail:'#8890A0'},
+  sunset:  {name:'Sunset Gull',  cost:500,   body:'#FFD3A8', wing:'#FF9F68', back:'#C9557A', trail:'#FF7F50'},
+  rainbow: {name:'Rainbow Gull', cost:700,   body:'#fff', wing:'#fff', back:'#fff', trail:'rainbow', special:'rainbow'},
+  neon:    {name:'Neon Gull',    cost:1500,  body:'#12E8DA', wing:'#FF2ED1', back:'#5B12C9', trail:'#12E8DA', glow:'#12E8DA'},
+  // the "why would anyone need this" skin — a genuine grind, and it looks the part
+  diamond: {name:'Diamond Gull', cost:30000, body:'#F5FAFF', wing:'#CFE8FF', back:'#B9D9F2', trail:'#FFFFFF', special:'diamond'},
+};
+let coins = 0;
+let unlockedSkins = ['classic'];
+let equippedSkin = 'classic';
+
+async function loadProgress(){
+  try{ const c = await Store.get('gullbomber:coins', false); if(c&&c.value) coins = parseInt(c.value)||0; }catch(e){}
+  try{ const u = await Store.get('gullbomber:unlocked', false); if(u&&u.value) unlockedSkins = JSON.parse(u.value); }catch(e){}
+  try{ const s = await Store.get('gullbomber:equipped', false); if(s&&s.value && SKINS[s.value]) equippedSkin = s.value; }catch(e){}
+  try{ const n = await Store.get('gullbomber:name', false); if(n&&n.value) document.getElementById('initialsInput').value = n.value; }catch(e){}
+  try{ const rh = await Store.get('gullbomber:seenReticleHint', false); seenReticleHint = !!(rh && rh.value); }catch(e){ seenReticleHint = true; }
+  updateCoinUI();
+  renderHangar();
+}
+async function saveProgress(){
+  try{ await Store.set('gullbomber:coins', String(coins), false); }catch(e){}
+  try{ await Store.set('gullbomber:unlocked', JSON.stringify(unlockedSkins), false); }catch(e){}
+  try{ await Store.set('gullbomber:equipped', equippedSkin, false); }catch(e){}
+}
+function updateCoinUI(){
+  document.getElementById('coinVal').textContent = coins;
+  const h = document.getElementById('coinValHangar');
+  if(h) h.textContent = coins;
+}
+function renderHangar(){
+  const grid = document.getElementById('skinGrid');
+  if(!grid) return;
+  grid.innerHTML = '';
+  for(const id in SKINS){
+    const sk = SKINS[id];
+    const owned = unlockedSkins.includes(id);
+    const card = document.createElement('div');
+    card.className = 'skinCard' + (owned? '' : ' locked') + (equippedSkin===id? ' equipped':'');
+    const swatch = sk.special==='rainbow' ? 'linear-gradient(135deg,#ff5f6d,#ffc371,#47cf73,#3E7BC4,#a86bd6)'
+      : sk.special==='diamond' ? 'linear-gradient(135deg,#ffffff,#cfe8ff,#f5faff,#dff0ff)'
+      : sk.body;
+    card.innerHTML =
+      '<div class="swatch" style="background:'+swatch+(sk.glow?';box-shadow:0 0 10px '+sk.glow:'')+'"></div>'+
+      '<div class="skinName">'+sk.name+'</div>'+
+      '<div class="skinCost">'+(owned ? (equippedSkin===id?'Equipped':'Tap to equip') : ('🪙 '+sk.cost.toLocaleString()))+'</div>'+
+      (owned? '' : '<div class="lockIcon">🔒</div>');
+    if(owned){
+      card.addEventListener('click', function(){ equippedSkin = id; saveProgress(); renderHangar(); Audio_.sfx.equip(); });
+    }
+    grid.appendChild(card);
+  }
+}
+
+// ---------- daily challenge tracking ----------
+let currentMode = 'endless'; // 'endless' | 'daily'
+let dailyBest = 0;
+function todayStr(){
+  const d = new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+async function loadDailyBest(){
+  try{
+    const r = await Store.get('gullbomber:dailybest:'+todayStr(), false);
+    if(r && r.value) dailyBest = parseInt(r.value)||0;
+  }catch(e){ dailyBest = 0; }
+}
+async function saveDailyBest(){
+  try{ await Store.set('gullbomber:dailybest:'+todayStr(), String(dailyBest), false); }catch(e){}
+}
+
+// ---------- seeded RNG (daily challenge = identical run for everyone) ----------
+let rng = Math.random;
+function mulberry32(seed){
+  return function(){
+    seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function seedFromString(str){
+  let h = 0;
+  for(let i=0;i<str.length;i++){ h = (Math.imul(31,h) + str.charCodeAt(i))|0; }
+  return h;
+}
+
+// ---------- shared leaderboard ----------
+function leaderboardKey(){
+  return currentMode==='daily' ? ('leaderboard:daily:'+todayStr()) : 'leaderboard:endless';
+}
+async function loadLeaderboard(key){
+  try{
+    const r = await Store.get(key, true);
+    if(r && r.value) return JSON.parse(r.value);
+  }catch(e){}
+  return [];
+}
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; });
+}
+function renderLeaderboard(list){
+  const el = document.getElementById('lbList');
+  if(!list.length){ el.innerHTML = '<div class="lbRow" style="justify-content:center; color:#999;">No scores yet, be the first!</div>'; return; }
+  el.innerHTML = list.slice(0,5).map(function(e,i){
+    return '<div class="lbRow"><span>'+(i+1)+'. '+escapeHtml(e.name)+'</span><span>'+e.score+'</span></div>';
+  }).join('');
+}
+async function refreshLeaderboard(){
+  const list = await loadLeaderboard(leaderboardKey());
+  renderLeaderboard(list);
+}
+// Two players finishing at the same moment can both read-modify-write the same shared
+// leaderboard key; whoever writes second silently erases the first's entry. There's no
+// transaction/compare-and-swap primitive available here, so instead: write, then read back
+// to confirm the entry actually survived, and if it didn't (because someone else's write
+// landed in between), re-merge and try again a few times with a small random backoff.
+function entrySurvives(list, entry){
+  if(list.some(function(e){ return e.ts===entry.ts && e.name===entry.name && e.score===entry.score; })) return true;
+  // not present is also fine if the board is full and every entry legitimately outscores ours
+  if(list.length>=20 && list.every(function(e){ return e.score>=entry.score; })) return true;
+  return false;
+}
+async function submitScore(){
+  const input = document.getElementById('initialsInput');
+  const name = (input.value||'').trim().toUpperCase().slice(0,8) || 'GULL';
+  input.value = name;
+  try{ await Store.set('gullbomber:name', name, false); }catch(e){}
+
+  const key = leaderboardKey();
+  const entry = {name:name, score:Math.max(0,Math.floor(score)), ts:Date.now()};
+  const btn = document.getElementById('submitScoreBtn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+
+  let finalList = [entry];
+  let ok = false;
+  for(let attempt=0; attempt<4 && !ok; attempt++){
+    if(attempt>0){ await new Promise(function(r){ setTimeout(r, 120 + Math.random()*220); }); }
+    let list = await loadLeaderboard(key);
+    if(!list.some(function(e){ return e.ts===entry.ts && e.name===entry.name; })) list.push(entry);
+    list.sort(function(a,b){ return b.score-a.score; });
+    list = list.slice(0,20);
+    try{ await Store.set(key, JSON.stringify(list), true); }catch(e){}
+    const verify = await loadLeaderboard(key);
+    if(entrySurvives(verify, entry)){ ok = true; finalList = verify; }
+    else { finalList = list; }
+  }
+
+  renderLeaderboard(finalList);
+  btn.disabled = false;
+  btn.textContent = ok ? 'Saved!' : 'Saved locally';
+  Audio_.sfx.saveSuccess();
+  setTimeout(function(){ btn.textContent = 'Save'; }, 1500);
+
+  // Remember today's best Daily Challenge submission so it can be checked against the
+  // final standings once the day is actually over — see loadPendingDailyReward().
+  if(currentMode==='daily'){
+    const date = todayStr();
+    let prev = null;
+    try{ const pr = await Store.get('gullbomber:pendingDailyReward', false); prev = pr && pr.value ? JSON.parse(pr.value) : null; }catch(e){}
+    if(!prev || prev.date!==date || entry.score>prev.score){
+      try{ await Store.set('gullbomber:pendingDailyReward', JSON.stringify({date:date, name:entry.name, score:entry.score, ts:entry.ts}), false); }catch(e){}
+    }
+  }
+}
+
+// Top-10 Daily Challenge finishers get a coin bonus — but "top 10" can only be judged once
+// the day is truly over, since someone else could still out-score you later that same day.
+// So the reward isn't paid at submit time: it's checked the next time the game loads after
+// that day has rolled over, against that day's final leaderboard.
+function dailyRewardForRank(rank){
+  if(rank===1) return 500;
+  if(rank<=3) return 300;
+  if(rank<=10) return 150;
+  return 0;
+}
+function showDailyRewardToast(rank, reward, date){
+  const body = document.getElementById('drtBody');
+  if(body) body.textContent = 'You placed #'+rank+' in the '+date+' Daily Challenge — +'+reward+' coins!';
+  const el = document.getElementById('dailyRewardToast');
+  if(!el) return;
+  el.classList.add('show');
+  Audio_.sfx.dailyReward();
+  setTimeout(function(){ el.classList.remove('show'); }, 6000);
+}
+async function loadPendingDailyReward(){
+  let pending = null;
+  try{
+    const r = await Store.get('gullbomber:pendingDailyReward', false);
+    pending = r && r.value ? JSON.parse(r.value) : null;
+  }catch(e){ return; }
+  if(!pending || !pending.date) return;
+  if(pending.date === todayStr()) return; // that day isn't over yet — leave it pending
+
+  try{
+    const list = await loadLeaderboard('leaderboard:daily:'+pending.date);
+    list.sort(function(a,b){ return b.score-a.score; });
+    const idx = list.findIndex(function(e){ return e.ts===pending.ts && e.name===pending.name && e.score===pending.score; });
+    const rank = idx>=0 ? idx+1 : null;
+    const reward = rank ? dailyRewardForRank(rank) : 0;
+    if(reward>0){
+      coins += reward;
+      await saveProgress();
+      updateCoinUI();
+      renderHangar();
+      showDailyRewardToast(rank, reward, pending.date);
+    }
+  }catch(e){}
+  try{ await Store.set('gullbomber:pendingDailyReward', '', false); }catch(e){}
+}
+
+// ---------- bird ----------
+const bird = { x:0, y:0, vy:0, r:20, wingPhase:0, wingBoost:0 };
+const GRAVITY = 1150;       // softer fall — less of a plummet
+const FLAP = -310;          // gentler climb per tap
+const MAX_FALL_VY = 600;    // terminal velocity so a long fall never spikes out of control
+const POO_VY0 = 70;
+const POO_G = GRAVITY*0.34; // much gentler arc — poo hangs in the air long enough to track and aim
+
+function resetBird(){
+  bird.x = Math.min(140, W*0.28);
+  bird.y = H*0.4;
+  bird.vy = 0;
+  bird.wingPhase = 0;
+}
+function flap(){
+  if(state==='start'){ startGame(); return; }
+  if(state!=='playing') return;
+  bird.vy = FLAP;
+  bird.wingBoost = 1;
+  Audio_.sfx.flap();
+}
+
+// ---------- decor (buildings / trees / beach elements) ----------
+let decorFar = [];
+let decorNear = [];
+function shadeColor(hex, amt){
+  const num = parseInt(hex.slice(1),16);
+  let r = (num>>16)+amt, g = ((num>>8)&0xFF)+amt, b = (num&0xFF)+amt;
+  r = Math.max(0,Math.min(255,r)); g = Math.max(0,Math.min(255,g)); b = Math.max(0,Math.min(255,b));
+  return '#'+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
+}
+function genDecor(arr, count, minH, maxH, spacing, colors, isBuilding, gap){
+  gap = gap===undefined ? 14 : gap;
+  arr.length = 0;
+  let x = -50;
+  for(let i=0;i<count;i++){
+    const h = minH + Math.random()*(maxH-minH);
+    const w = spacing*(0.7+Math.random()*0.6);
+    const color = colors[Math.random()<0.5?0:1];
+    // precomputed shade variants (once per item, not per frame) so trees/palms/etc can
+    // layer lighter/darker tones for depth without recomputing color math every draw call
+    const b = {x, w, h, color, colorDark: shadeColor(color,-26), colorLight: shadeColor(color,24)};
+    if(isBuilding){
+      // Every building gets a full window grid now (precomputed once here, not re-rolled
+      // per frame — that per-frame re-roll was the original cause of the cityscape stutter).
+      // Previously only ~35% of buildings got windows at all, so most of the skyline was
+      // flat, textureless blocks — now every building is textured, with a per-window
+      // lit/dark mix instead of an all-or-nothing per-building coin flip.
+      b.windows = []; // [wx, wy, lit] triples, relative to the building's top-left
+      for(let wy=14; wy<h-10; wy+=22){
+        for(let wx=8; wx<w-8; wx+=16){
+          if(Math.random()<0.08) continue; // the odd gap keeps the grid from feeling too uniform
+          b.windows.push(wx, wy, Math.random()<0.4 ? 1 : 0);
+        }
+      }
+      // one rooftop feature, picked once per building, so the skyline silhouette isn't just
+      // a row of flat-topped rectangles
+      const roofRoll = Math.random();
+      b.roof = roofRoll<0.22 ? 'tank' : roofRoll<0.4 ? 'antenna' : roofRoll<0.58 ? 'ac' : 'ledge';
+    }
+    arr.push(b);
+    x += w + gap;
+  }
+}
+let decorFarGap = 14, decorNearGap = 14;
+function regenDecor(sc){
+  decorFarGap = 14; decorNearGap = 14;
+  if(sc.decor==='buildings'){
+    genDecor(decorFar, 14, H*0.18, H*0.5, 90, sc.farColors, true);
+    genDecor(decorNear, 10, H*0.12, H*0.34, 130, sc.nearColors, true);
+  } else if(sc.decor==='trees'){
+    genDecor(decorFar, 12, H*0.14, H*0.26, 80, sc.farColors);
+    genDecor(decorNear, 9, H*0.16, H*0.32, 110, sc.nearColors);
+  } else if(sc.decor==='beach'){
+    // whittled down from 6 to 2 (~25%) — the hazy sailboat horizon was so dense it looked like
+    // a boat traffic jam rather than a few distant sails dotting the horizon
+    decorFarGap = 240; // spread the 2 remaining boats further apart across the horizon (was the shared 14px gap)
+    genDecor(decorFar, 2, H*0.05, H*0.09, 260, sc.farColors, false, decorFarGap); // distant waves/boats strip
+    genDecor(decorNear, 7, H*0.1, H*0.22, 150, sc.nearColors); // palm trees
+  } else if(sc.decor==='harbour'){
+    genDecor(decorFar, 9, H*0.16, H*0.4, 105, sc.farColors, true); // dockside warehouses, windows lit
+    genDecor(decorNear, 6, H*0.3, H*0.52, 190, sc.nearColors); // gantry cranes, mixed with container stacks
+    // mix in shipping-container stacks among the cranes so the near layer isn't just
+    // identical cranes on repeat — picked once per item at generation time
+    for(const b of decorNear){ b.kind = Math.random()<0.55 ? 'crane' : 'containers'; }
+  } else if(sc.decor==='seaside'){
+    // previously reused the shared 'buildings' renderer (isBuilding:true) for this layer —
+    // that gives every item a tall office-block silhouette, a dense window grid, and a
+    // rooftop water tank/antenna, which reads as generic mid-rise apartments, not a quaint
+    // 2-3 storey seafront terrace. A dedicated terraced-house renderer below
+    // (decorType==='seasideFar') fixed the shape, but they still read as one solid blocky
+    // wall — much shorter and narrower now (real small-house proportions, not scaled-down
+    // towers), which also means the shared 14px item gap reads as real daylight between
+    // houses instead of a rounding error on a much bigger silhouette.
+    genDecor(decorFar, 14, H*0.05, H*0.085, 52, sc.farColors);
+    genDecor(decorNear, 7, H*0.11, H*0.15, 165, sc.nearColors); // candy-stripe beach huts along the prom
+  }
+}
+
+function drawDecorLayer(arr, alpha, yBase, decorType){
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  if(decorType==='beachFar'){
+    // continuous sea band behind the boats, drawn full-width before the boats themselves so
+    // there's always visible water — including in the gaps between boats — rather than boats
+    // floating on bare sky with nothing beneath them until one happens to be on screen
+    const seaTop = yBase-40, seaH = 55;
+    const grad = ctx.createLinearGradient(0, seaTop, 0, seaTop+seaH);
+    grad.addColorStop(0, 'rgba(150,205,222,0.6)');
+    grad.addColorStop(1, 'rgba(88,162,192,0.75)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, seaTop, W, seaH);
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1.3;
+    const rippleSpacing = 44;
+    const rOff = (elapsed*worldSpeed*0.2)%rippleSpacing;
+    ctx.beginPath();
+    for(let x=-rOff; x<W+20; x+=rippleSpacing){
+      ctx.moveTo(x, seaTop+seaH*0.55);
+      ctx.quadraticCurveTo(x+rippleSpacing*0.25, seaTop+seaH*0.4, x+rippleSpacing*0.5, seaTop+seaH*0.55);
+      ctx.quadraticCurveTo(x+rippleSpacing*0.75, seaTop+seaH*0.7, x+rippleSpacing, seaTop+seaH*0.55);
+    }
+    ctx.stroke();
+  }
+  for(const b of arr){
+    if(decorType==='buildings'){
+      const top = yBase - b.h;
+      ctx.fillStyle = b.color;
+      ctx.fillRect(b.x, top, b.w, b.h+40);
+      // a soft shaded strip down the right edge — the cheapest way to fake a light source
+      // and stop each building reading as a flat, paper-thin silhouette
+      ctx.fillStyle = 'rgba(0,0,0,0.14)';
+      const shadeW = Math.max(4, b.w*0.12);
+      ctx.fillRect(b.x+b.w-shadeW, top, shadeW, b.h+40);
+      if(b.windows){
+        for(let i=0;i<b.windows.length;i+=3){
+          ctx.fillStyle = b.windows[i+2] ? 'rgba(255,230,140,0.62)' : 'rgba(18,24,36,0.4)';
+          ctx.fillRect(b.x + b.windows[i], top + b.windows[i+1], 7, 10);
+        }
+      }
+      // rooftop feature so the skyline isn't a row of flat-topped blocks
+      if(b.roof==='tank'){
+        ctx.fillStyle = 'rgba(35,32,30,0.55)';
+        ctx.fillRect(b.x+b.w*0.35, top-14, b.w*0.3, 12);
+        ctx.beginPath();
+        ctx.moveTo(b.x+b.w*0.3, top-14); ctx.lineTo(b.x+b.w*0.65, top-14); ctx.lineTo(b.x+b.w*0.475, top-25);
+        ctx.closePath(); ctx.fill();
+      } else if(b.roof==='antenna'){
+        ctx.strokeStyle = 'rgba(35,32,30,0.6)'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(b.x+b.w*0.5, top); ctx.lineTo(b.x+b.w*0.5, top-24); ctx.stroke();
+        ctx.fillStyle = 'rgba(255,90,80,0.85)';
+        ctx.beginPath(); ctx.arc(b.x+b.w*0.5, top-24, 2.4, 0, Math.PI*2); ctx.fill();
+      } else if(b.roof==='ac'){
+        ctx.fillStyle = 'rgba(35,32,30,0.5)';
+        ctx.fillRect(b.x+b.w*0.18, top-8, b.w*0.18, 8);
+        ctx.fillRect(b.x+b.w*0.55, top-11, b.w*0.2, 11);
+      } else {
+        ctx.fillStyle = 'rgba(0,0,0,0.16)';
+        ctx.fillRect(b.x, top-3, b.w, 3);
+      }
+    } else if(decorType==='seasideFar'){
+      // pastel terraced seafront house: previously this layer just reused the shared
+      // 'buildings' renderer, which gives every item a tall office-block shape, a dense
+      // window grid, and a rooftop water tank/antenna — reads as generic mid-rise apartments,
+      // not a quaint seaside terrace. This is a proper low, pitched-roof house instead: a
+      // gently sloped roof with a chimney pot, two rows of small sash windows with a cross
+      // mullion, and a front door — squat proportions instead of a skyscraper silhouette.
+      const top = yBase - b.h;
+      ctx.fillStyle = b.color;
+      ctx.fillRect(b.x, top, b.w, b.h+30);
+      ctx.fillStyle = 'rgba(0,0,0,0.1)';
+      const shadeW = Math.max(3, b.w*0.1);
+      ctx.fillRect(b.x+b.w-shadeW, top, shadeW, b.h+30);
+      // pitched roof, gently overhanging both edges
+      const roofH = b.h*0.26, overhang = b.w*0.08;
+      ctx.beginPath();
+      ctx.moveTo(b.x-overhang, top);
+      ctx.lineTo(b.x+b.w*0.5, top-roofH);
+      ctx.lineTo(b.x+b.w+overhang, top);
+      ctx.closePath();
+      ctx.fillStyle = b.colorDark; ctx.fill();
+      // chimney pot
+      ctx.fillStyle = b.colorDark;
+      ctx.fillRect(b.x+b.w*0.68, top-roofH*0.75, b.w*0.08, roofH*0.6);
+      // two rows of small sash windows (2 across), each with a cross mullion
+      const winW = b.w*0.2, winH = b.h*0.24;
+      const rows = [top+b.h*0.16, top+b.h*0.52];
+      const cols = [b.x+b.w*0.16, b.x+b.w*0.64];
+      for(const wy of rows){
+        for(const wx of cols){
+          ctx.fillStyle = 'rgba(255,255,255,0.85)';
+          ctx.fillRect(wx, wy, winW, winH);
+          ctx.fillStyle = 'rgba(130,175,195,0.55)';
+          ctx.fillRect(wx+1, wy+1, winW-2, winH-2);
+          ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1.4;
+          ctx.beginPath();
+          ctx.moveTo(wx+winW/2, wy); ctx.lineTo(wx+winW/2, wy+winH);
+          ctx.moveTo(wx, wy+winH/2); ctx.lineTo(wx+winW, wy+winH/2);
+          ctx.stroke();
+        }
+      }
+      // front door, centered at the base, with a small step
+      const doorW = b.w*0.16, doorH = b.h*0.34;
+      const dx = b.x+b.w*0.5-doorW/2, dy = yBase-doorH;
+      ctx.fillStyle = 'rgba(0,0,0,0.08)';
+      ctx.fillRect(dx-3, yBase-2, doorW+6, 3);
+      ctx.fillStyle = b.colorDark;
+      ctx.beginPath();
+      ctx.moveTo(dx, dy+doorH); ctx.lineTo(dx, dy+doorH*0.28);
+      ctx.quadraticCurveTo(dx, dy, dx+doorW/2, dy);
+      ctx.quadraticCurveTo(dx+doorW, dy, dx+doorW, dy+doorH*0.28);
+      ctx.lineTo(dx+doorW, dy+doorH);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = 'rgba(255,224,150,0.7)';
+      ctx.beginPath(); ctx.arc(dx+doorW*0.78, dy+doorH*0.55, 1.4, 0, Math.PI*2); ctx.fill();
+    } else if(decorType==='trees'){
+      const cx = b.x + b.w/2;
+      const trunkW = Math.max(8, b.w*0.15), trunkH = b.h*0.36+28;
+      // ground shadow first, so the tree looks planted rather than floating
+      ctx.fillStyle = 'rgba(0,0,0,0.15)';
+      ctx.beginPath(); ctx.ellipse(cx, yBase+21, b.w*0.4, 6, 0, 0, Math.PI*2); ctx.fill();
+      // two-tone trunk (a lit side + a shaded side) instead of a flat bark-colored rectangle
+      ctx.fillStyle = '#4A3620';
+      ctx.fillRect(cx-trunkW/2, yBase-trunkH+26, trunkW, trunkH);
+      ctx.fillStyle = '#6E5030';
+      ctx.fillRect(cx-trunkW/2, yBase-trunkH+26, trunkW*0.42, trunkH);
+      // layered canopy: a dark base blob for depth, several overlapping lighter clusters on
+      // top so it reads as foliage volume rather than one flat circular outline
+      const cy = yBase - b.h*0.56, cr = b.w*0.55;
+      ctx.fillStyle = b.colorDark;
+      ctx.beginPath(); ctx.ellipse(cx, cy, cr, cr*0.94, 0, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = b.color;
+      ctx.beginPath(); ctx.ellipse(cx-cr*0.34, cy-cr*0.12, cr*0.62, cr*0.58, 0, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(cx+cr*0.36, cy-cr*0.02, cr*0.56, cr*0.52, 0, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(cx, cy-cr*0.42, cr*0.5, cr*0.46, 0, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = b.colorLight;
+      ctx.beginPath(); ctx.ellipse(cx-cr*0.14, cy-cr*0.38, cr*0.3, cr*0.24, 0, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(cx+cr*0.22, cy-cr*0.2, cr*0.22, cr*0.18, 0, 0, Math.PI*2); ctx.fill();
+      // a few small texture dabs so the canopy edge isn't perfectly smooth
+      ctx.fillStyle = b.colorDark;
+      for(let d=0; d<5; d++){
+        const ang = (d/5)*Math.PI*2;
+        ctx.beginPath();
+        ctx.ellipse(cx+Math.cos(ang)*cr*0.72, cy+Math.sin(ang)*cr*0.6, cr*0.14, cr*0.1, ang, 0, Math.PI*2);
+        ctx.fill();
+      }
+    } else if(decorType==='beachFar'){
+      // hazy distant sailboats on the horizon — previously a flat teal ellipse hull with one
+      // plain triangle sail, which read as barely more than a colored wedge. Gave the hull an
+      // actual curved boat shape (pointed bow, flatter stern) with a waterline stripe, split
+      // the single sail into a bigger main sail + a smaller jib in front of the mast, and
+      // added a soft reflection ripple under the hull so it reads as a boat sitting on water.
+      // this whole layer renders at reduced opacity (it's the hazy background layer), which
+      // was making the sail/mast nearly invisible against the pale sky — boosted their own
+      // opacity and darkened the mast/outline so the boats stay clearly readable even faded
+      // sit the hull right on the sea's horizon line (the sea band's top edge, drawn just above
+      // this loop) rather than down near b.h*0.25 above yBase, which put boats floating well
+      // below the horizon in the middle of the sea band instead of appearing distant on the
+      // skyline where sea meets sky
+      const hullY = (yBase-40) + 3;
+      const hw = b.w*0.52, hh = b.h*0.32;
+      const bx = b.x+b.w*0.5;
+      ctx.fillStyle = b.color;
+      ctx.beginPath();
+      ctx.moveTo(bx-hw, hullY);
+      ctx.quadraticCurveTo(bx-hw*0.85, hullY+hh, bx, hullY+hh);
+      ctx.quadraticCurveTo(bx+hw*0.75, hullY+hh, bx+hw*1.05, hullY);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = 'rgba(20,20,20,0.4)'; ctx.lineWidth = 1.2;
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(bx-hw*0.65, hullY+hh*0.42); ctx.lineTo(bx+hw*0.78, hullY+hh*0.42); ctx.stroke();
+      ctx.strokeStyle = 'rgba(20,20,20,0.85)'; ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.moveTo(bx, hullY); ctx.lineTo(bx, hullY-b.h*1.9); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.95)';
+      ctx.beginPath();
+      ctx.moveTo(bx, hullY-b.h*1.85);
+      ctx.quadraticCurveTo(bx+hw*1.35, hullY-b.h*0.85, bx+hw*0.14, hullY-b.h*0.12);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = 'rgba(20,20,20,0.25)'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.82)';
+      ctx.beginPath();
+      ctx.moveTo(bx, hullY-b.h*1.25);
+      ctx.quadraticCurveTo(bx-hw*0.55, hullY-b.h*0.55, bx-hw*0.08, hullY-b.h*0.1);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = 'rgba(20,20,20,0.2)'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(bx-hw*0.55, hullY+hh+4); ctx.lineTo(bx+hw*0.7, hullY+hh+4); ctx.stroke();
+    } else if(decorType==='beach'){
+      // palm tree: a segmented, tapering trunk (thicker at the base, thin near the crown,
+      // with dark bark-ring notches) leaning into a fan of drooping, pointed fronds —
+      // rather than one uniform-width curve topped with plain blobs
+      const baseX = b.x, baseY = yBase+20, leanX = 0; // straight vertical trunk, not leaning
+      const crownX = baseX+leanX, crownY = yBase-b.h;
+      const segs = 6;
+      for(let i=0;i<segs;i++){
+        const t0=i/segs, t1=(i+1)/segs;
+        const e0=Math.pow(t0,1.15), e1=Math.pow(t1,1.15);
+        const x0=baseX+leanX*e0, y0=baseY+(crownY-baseY)*t0;
+        const x1=baseX+leanX*e1, y1=baseY+(crownY-baseY)*t1;
+        const lw = Math.max(2.5, b.w*0.17*(1-t0*0.6));
+        ctx.strokeStyle = '#8A6339'; ctx.lineWidth = lw; ctx.lineCap='round';
+        ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke();
+        ctx.strokeStyle = 'rgba(0,0,0,0.22)'; ctx.lineWidth = Math.max(1,lw*0.22);
+        ctx.beginPath(); ctx.moveTo(x0,y0+1.5); ctx.lineTo(x1,y1+1.5); ctx.stroke();
+      }
+      // fronds: previously thin, dead-straight spikes fanned out flat from the crown — read
+      // more like a starburst/asterisk than an actual palm. Reworked so each frond has real
+      // width that tapers to a point (not a hairline), arches up and away from the crown
+      // before curving down, with the outer fronds drooping well past horizontal (the classic
+      // "spider" palm silhouette the straight fan never had), plus a center rib and a few
+      // small angled leaflet ticks along it for a feathered texture instead of a flat blob.
+      const frondCount = 6;
+      for(let f=0; f<frondCount; f++){
+        const t = f/(frondCount-1); // 0..1 across the fan
+        const ang = -Math.PI*0.86 + t*Math.PI*0.72; // spread across the top, left to right
+        const side = t-0.5; // -0.5..0.5, distance from center
+        const len = b.w*(1.0 - Math.abs(side)*0.28);
+        // outer fronds used to droop well past horizontal, hanging all the way down past the
+        // crown — you said that read as long droopy bits rather than a palm fan, so this is
+        // cut down to a gentle downward curve at the tips instead, keeping the arched fan shape
+        const droop = Math.pow(Math.abs(side)*2, 1.3) * b.w*0.18;
+        const tipX = crownX + Math.cos(ang)*len;
+        const tipY = crownY + Math.sin(ang)*len*0.3 + droop;
+        // the arch control point sits ABOVE the straight crown-to-tip line, giving the frond
+        // a graceful upward curve before it droops, instead of a dead-straight spike
+        const archX = crownX + Math.cos(ang)*len*0.55;
+        const archY = crownY + Math.sin(ang)*len*0.15 - b.w*0.22;
+        const baseW = b.w*0.13;
+        const perpX = -Math.sin(ang), perpY = Math.cos(ang);
+        ctx.fillStyle = f%2===0 ? b.colorDark : b.color;
+        ctx.beginPath();
+        ctx.moveTo(crownX+perpX*baseW, crownY+perpY*baseW);
+        ctx.quadraticCurveTo(archX+perpX*baseW*0.3, archY+perpY*baseW*0.3, tipX, tipY);
+        ctx.quadraticCurveTo(archX-perpX*baseW*0.3, archY-perpY*baseW*0.3, crownX-perpX*baseW, crownY-perpY*baseW);
+        ctx.closePath(); ctx.fill();
+        // center rib
+        ctx.strokeStyle = 'rgba(0,0,0,0.24)'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(crownX,crownY); ctx.quadraticCurveTo(archX,archY,tipX,tipY); ctx.stroke();
+        // small feathered leaflet ticks along the rib, alternating sides
+        ctx.strokeStyle = 'rgba(0,0,0,0.16)'; ctx.lineWidth = 1;
+        for(let k=1;k<=4;k++){
+          const kt = k/5;
+          const qx = (1-kt)*(1-kt)*crownX + 2*(1-kt)*kt*archX + kt*kt*tipX;
+          const qy = (1-kt)*(1-kt)*crownY + 2*(1-kt)*kt*archY + kt*kt*tipY;
+          const tickLen = baseW*(1-kt*0.7);
+          const sgn = k%2===0 ? 1 : -1;
+          ctx.beginPath();
+          ctx.moveTo(qx, qy);
+          ctx.lineTo(qx+perpX*tickLen*sgn, qy+perpY*tickLen*sgn-2);
+          ctx.stroke();
+        }
+      }
+      // a couple of coconuts nestled under the crown
+      ctx.fillStyle = '#4A3620';
+      ctx.beginPath(); ctx.arc(crownX-4, crownY+7, 3.3, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(crownX+3, crownY+10, 3, 0, Math.PI*2); ctx.fill();
+    } else if(decorType==='cranes' && b.kind==='containers'){
+      // a low stack of two shipping containers — corrugated ridges, a door outline, and a
+      // contrasting second color — for variety against the gantry cranes on their own
+      const cW = b.w*0.92, cH = Math.max(20, b.h*0.24);
+      const c1 = b.color, c2 = b.colorDark;
+      ctx.fillStyle = c1;
+      ctx.fillRect(b.x, yBase-cH, cW, cH+28);
+      ctx.fillStyle = c2;
+      ctx.fillRect(b.x+cW*0.1, yBase-cH*2-6, cW*0.86, cH);
+      ctx.strokeStyle = 'rgba(0,0,0,0.22)'; ctx.lineWidth = 1;
+      ctx.beginPath();
+      for(let rx=6; rx<cW-4; rx+=8){ ctx.moveTo(b.x+rx, yBase-cH*2-6); ctx.lineTo(b.x+rx, yBase+22); }
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 2;
+      ctx.strokeRect(b.x+cW*0.06, yBase-cH+4, cW*0.2, cH-8);
+    } else if(decorType==='cranes'){
+      // dockside gantry crane: two support legs (uneven, for a bit of perspective), a horizontal
+      // jib along the top, a counterweight at the back, and a hanging cable+hook over the dock
+      const legW = Math.max(6, b.w*0.09);
+      ctx.fillStyle = b.color;
+      ctx.fillRect(b.x + b.w*0.08, yBase-b.h*0.72, legW, b.h*0.72+30);
+      ctx.fillRect(b.x + b.w*0.5 - legW/2, yBase-b.h, legW, b.h+30);
+      ctx.fillRect(b.x, yBase-b.h, b.w, Math.max(5, b.h*0.05));
+      ctx.fillRect(b.x-10, yBase-b.h-8, 20, 16);
+      ctx.strokeStyle = 'rgba(20,20,20,0.4)'; ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(b.x+b.w*0.82, yBase-b.h+4);
+      ctx.lineTo(b.x+b.w*0.82, yBase-b.h*0.4);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(20,20,20,0.45)';
+      ctx.fillRect(b.x+b.w*0.82-4, yBase-b.h*0.4, 8, 7);
+    } else if(decorType==='seaside'){
+      // candy-stripe beach hut: a small gable-roofed box in the item's own color, with a
+      // striped door awning, a round window, and a little pennant flag at the roof peak —
+      // the classic British-seaside-promenade look
+      const hutW = b.w*0.7, hutH = b.h*1.35;
+      const hx = b.x + (b.w-hutW)/2, hy = yBase - hutH;
+      ctx.fillStyle = 'rgba(0,0,0,0.12)';
+      ctx.beginPath(); ctx.ellipse(hx+hutW*0.5, yBase+3, hutW*0.6, 5, 0, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#F7F1E3';
+      ctx.fillRect(hx, hy, hutW, hutH);
+      ctx.fillStyle = 'rgba(0,0,0,0.08)';
+      ctx.fillRect(hx+hutW*0.8, hy, hutW*0.2, hutH);
+      const roofH = hutH*0.5, overhang = hutW*0.14;
+      ctx.beginPath();
+      ctx.moveTo(hx-overhang, hy);
+      ctx.lineTo(hx+hutW*0.5, hy-roofH);
+      ctx.lineTo(hx+hutW+overhang, hy);
+      ctx.closePath();
+      ctx.fillStyle = b.color; ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.15)'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.strokeStyle = 'rgba(50,40,30,0.6)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(hx+hutW*0.5, hy-roofH); ctx.lineTo(hx+hutW*0.5, hy-roofH-10); ctx.stroke();
+      ctx.fillStyle = b.colorDark;
+      ctx.beginPath();
+      ctx.moveTo(hx+hutW*0.5, hy-roofH-10);
+      ctx.lineTo(hx+hutW*0.5+7, hy-roofH-7);
+      ctx.lineTo(hx+hutW*0.5, hy-roofH-4);
+      ctx.closePath(); ctx.fill();
+      const doorW = hutW*0.34, doorH = hutH*0.62;
+      const dx = hx+hutW*0.5-doorW/2, dy = hy+hutH-doorH;
+      ctx.fillStyle = b.colorDark;
+      ctx.fillRect(dx, dy, doorW, doorH);
+      // little striped awning above the door
+      const awnY = dy-8, stripes = 4;
+      for(let s=0;s<stripes;s++){
+        ctx.fillStyle = s%2===0 ? b.color : '#F7F1E3';
+        ctx.beginPath();
+        ctx.moveTo(dx-2+(doorW+4)*s/stripes, awnY+8);
+        ctx.lineTo(dx-2+(doorW+4)*(s+1)/stripes, awnY+8);
+        ctx.lineTo(dx-2+(doorW+4)*(s+1)/stripes-2, awnY);
+        ctx.lineTo(dx-2+(doorW+4)*s/stripes+2, awnY);
+        ctx.closePath(); ctx.fill();
+      }
+      // round window
+      ctx.fillStyle = 'rgba(60,90,110,0.55)';
+      ctx.beginPath(); ctx.arc(hx+hutW*0.22, hy+hutH*0.3, hutW*0.09, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.2)'; ctx.lineWidth = 1; ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+function wrapDecor(arr, gap){
+  gap = gap===undefined ? 14 : gap;
+  let maxX = -Infinity;
+  for(const b of arr) maxX = Math.max(maxX, b.x+b.w);
+  for(const b of arr){
+    if(b.x + b.w < -20){
+      b.x = maxX + gap;
+      maxX = b.x + b.w;
+    }
+  }
+}
+
+// ---------- ground targets ----------
+let targets = [];
+let targetTimer = 0;
+function targetSizeMultiplier(){
+  const start = 1.15, end = 0.75, rampTime = 55;
+  return Math.max(end, start - (start-end)*Math.min(1, elapsed/rampTime));
+}
+// The ground starts crowded (lots to aim at) and gradually thins out as a run goes on,
+// so precision matters more later instead of just relying on target size shrinking.
+function targetSpawnInterval(){
+  const start = 0.42, end = 1.3, rampTime = 65;
+  const base = start + (end-start)*Math.min(1, elapsed/rampTime);
+  return base + rng()*base*0.6;
+}
+const TARGET_RING_BASE = 24;
+function spawnTarget(){
+  const keys = Object.keys(TARGETS);
+  const infos = keys.map(k=> TARGETS[k]);
+  const weights = keys.map(k=> TARGETS[k].weight);
+  // mix in this scene's one exclusive special (picnic table, sandcastle, etc.) alongside the
+  // 5 universal targets, at its own rarity — see SCENE_SPECIALS above
+  const special = SCENE_SPECIALS[scene.key];
+  if(special){ infos.push(special); weights.push(special.weight); }
+  const total = weights.reduce((a,b)=>a+b,0);
+  let r = rng()*total, idx = 0;
+  for(let i=0;i<weights.length;i++){ if(r<weights[i]){idx=i;break;} r-=weights[i]; }
+  const info = infos[idx];
+  const sizeMul = targetSizeMultiplier();
+  const ringR = TARGET_RING_BASE*info.ringMul*sizeMul;
+  targets.push({
+    x: W+60, w:ringR*2.3, ringR, sizeMul, art:info.art, pts:info.pts, good:true, sparkle:!!info.sparkle,
+    sparklePhase: Math.random()*Math.PI*2, bobPhase: Math.random()*Math.PI*2
+  });
+}
+
+// ---------- sky obstacles (eased-in difficulty) ----------
+let obstacles = [];
+let spawnsSinceTopThreat = 0; // guarantees a genuinely ceiling-threatening obstacle
+// on a bounded cadence, rather than leaving it to a rare independent RNG roll
+// each time (uniform sampling naturally under-serves any narrow sub-band, which
+// is what let ceiling-camping feel safe "for ages" even after it became possible)
+const OB_TYPES = {
+  kite:  {emoji:'🪁', r:18, speedMul:0.55},
+  bird:  {emoji:'🐦', r:16, speedMul:1.25},
+  eagle: {emoji:'🦅', r:22, speedMul:1.1},
+  plane: {emoji:'✈️', r:26, speedMul:1.15},
+};
+let obstacleTimer = 1.0; // short grace period before obstacles begin
+function allowedObstacleKeys(){
+  if(elapsed<4) return ['kite'];
+  if(elapsed<12) return ['kite','bird'];
+  if(elapsed<24) return ['kite','bird','eagle'];
+  return ['kite','bird','eagle','plane'];
+}
+
+// ---------- food ----------
+let foods = [];
+const FOOD_TYPES = [
+  {emoji:'🐟', charge:40, r:16},
+  {emoji:'🍟', charge:25, r:15},
+  {emoji:'🍕', charge:30, r:16},
+];
+let foodTimer = 0.6;
+
+// ---------- poo projectiles ----------
+let poops = [];
+
+// ---------- popups ----------
+let popups = [];
+function addPopup(x,y,text,color){ popups.push({x,y,text,color, life:1.0, vy:-40}); }
+
+// ---------- impact splats (poo landing) ----------
+// A small particle burst + expanding ring at the point of impact, so a hit/miss feels like
+// it actually landed instead of just a floating text popup — cheap (handful of tiny circles,
+// a few frames of life) and self-cleans via the life countdown, same pattern as popups.
+let splats = [];
+function addSplat(x, y, color){
+  const drops = 6 + Math.floor(Math.random()*3);
+  for(let i=0;i<drops;i++){
+    const ang = Math.random()*Math.PI - Math.PI; // upward-ish fan
+    const spd = 60 + Math.random()*90;
+    splats.push({
+      x, y, vx: Math.cos(ang)*spd, vy: Math.sin(ang)*spd*0.6 - 40,
+      life: 1, r: 2 + Math.random()*2.2, color
+    });
+  }
+  splats.push({x, y, ring:true, life:1, color});
+}
+
+// ---------- input ----------
+function pointerDown(e){
+  const t = e.target;
+  if(t && t.closest && t.closest('button, input, .skinCard, .overlay, #pooBtn, #desktopHint')) return;
+  flap();
+}
+window.addEventListener('mousedown', pointerDown);
+window.addEventListener('touchstart', function(e){ pointerDown(e); }, {passive:true});
+window.addEventListener('keydown', function(e){
+  if(e.code==='Space'){ e.preventDefault(); flap(); }
+  if(e.code==='Enter' || e.code==='NumpadEnter'){ e.preventDefault(); firePooKeyboard(); }
+});
+function firePooKeyboard(){
+  firePoo();
+  pooBtn.classList.add('kbdPulse');
+  setTimeout(()=>pooBtn.classList.remove('kbdPulse'), 180);
+}
+
+const pooBtn = document.getElementById('pooBtn');
+const readyToast = document.getElementById('readyToast');
+const reticleHint = document.getElementById('reticleHint');
+function dismissReticleHint(){
+  if(reticleHintTimer){ clearTimeout(reticleHintTimer); reticleHintTimer = null; }
+  reticleHint.classList.remove('show');
+}
+// Shown once, ever, on a genuinely new player's first run — a brief nudge toward the aiming
+// reticle, then it's marked seen (persisted) and never appears again, including on every
+// subsequent run this same session. Deliberately not repeated: this game is meant to be
+// replayed constantly, and a returning-player hint would just get in the way.
+// Note: "seen" is only recorded once the hint actually becomes visible, not when it's
+// scheduled — a first-timer who dies (falls with no input) inside the initial delay would
+// otherwise lose the hint forever without ever having seen it.
+function maybeShowReticleHint(){
+  if(seenReticleHint) return;
+  setTimeout(function(){
+    if(state!=='playing' || seenReticleHint) return;
+    seenReticleHint = true;
+    try{ Store.set('gullbomber:seenReticleHint', '1', false); }catch(e){}
+    reticleHint.classList.add('show');
+    reticleHintTimer = setTimeout(dismissReticleHint, 5000);
+  }, 900);
+}
+function firePoo(e){
+  if(e) e.stopPropagation();
+  if(state!=='playing') return;
+  if(pooCharge < POO_MAX) return;
+  pooCharge = 0;
+  toastShown = false;
+  readyToast.classList.remove('show');
+  dismissReticleHint();
+  poops.push({x:bird.x+10, y:bird.y+6, vx:0, vy:POO_VY0});
+  Audio_.sfx.pooLaunch();
+}
+pooBtn.addEventListener('mousedown', firePoo);
+pooBtn.addEventListener('touchstart', function(e){ e.preventDefault(); firePoo(e); }, {passive:false});
+
+// ---------- UI wiring ----------
+const startOverlay = document.getElementById('startOverlay');
+const overOverlay = document.getElementById('overOverlay');
+const hangarOverlay = document.getElementById('hangarOverlay');
+const sceneBanner = document.getElementById('sceneBanner');
+document.getElementById('startEndlessBtn').addEventListener('click', ()=>startGame('endless'));
+document.getElementById('startDailyBtn').addEventListener('click', ()=>startGame('daily'));
+document.getElementById('restartBtn').addEventListener('click', ()=>startGame(currentMode));
+document.getElementById('backToMenuBtn').addEventListener('click', ()=>{
+  overOverlay.classList.add('hidden');
+  startOverlay.classList.remove('hidden');
+});
+document.getElementById('hangarBtn').addEventListener('click', ()=>{ renderHangar(); hangarOverlay.classList.remove('hidden'); });
+document.getElementById('closeHangarBtn').addEventListener('click', ()=>{ hangarOverlay.classList.add('hidden'); });
+document.getElementById('submitScoreBtn').addEventListener('click', submitScore);
+document.getElementById('muteBtn').addEventListener('click', ()=>Audio_.toggleMute());
+document.querySelectorAll('.btn, .modeBtn, .ghostBtn, #hangarBtn').forEach(el=>{
+  el.addEventListener('click', ()=>Audio_.sfx.uiClick());
+});
+
+let bannerTimer = 0;
+function showBanner(text){
+  sceneBanner.textContent = text;
+  sceneBanner.classList.add('show');
+  bannerTimer = 2.6;
+  Audio_.sfx.sceneChange();
+}
+
+let trail = [];
+
+function startGame(mode){
+  currentMode = mode || currentMode || 'endless';
+  state = 'playing';
+  score = 0;
+  pooCharge = 0;
+  comboStreak = 0;
+  elapsed = 0;
+  worldSpeed = 190;
+  toastShown = false;
+  targets = []; obstacles = []; foods = []; poops = []; popups = []; splats = []; trail = []; spawnsSinceTopThreat = 0;
+  targetTimer = 0.5; obstacleTimer = 2.5; foodTimer = 0.6;
+  sceneIndex = 0; scene = SCENES[0];
+  rng = (currentMode==='daily') ? mulberry32(seedFromString('gullbomber-'+todayStr())) : Math.random;
+  resetBird();
+  regenDecor(scene);
+  document.getElementById('bestLabel').textContent = currentMode==='daily' ? "TODAY'S BEST" : 'BEST';
+  document.getElementById('bestVal').textContent = Math.max(0,Math.floor(currentMode==='daily'?dailyBest:best));
+  startOverlay.classList.add('hidden');
+  overOverlay.classList.add('hidden');
+  hangarOverlay.classList.add('hidden');
+  readyToast.classList.remove('show');
+  dismissReticleHint();
+  showBanner(currentMode==='daily' ? '📅 Daily Challenge' : scene.name);
+  maybeShowReticleHint();
+  updateHUD();
+}
+
+async function endGame(){
+  state = 'over';
+  screenShake = SHAKE_DURATION;
+  dismissReticleHint();
+  const finalScore = Math.max(0, Math.floor(score));
+
+  let isNewBest = false;
+  if(currentMode==='daily'){
+    if(finalScore > dailyBest){ dailyBest = finalScore; saveDailyBest(); isNewBest = true; }
+  } else {
+    if(finalScore > best){ best = finalScore; saveBest(); isNewBest = true; }
+  }
+  document.getElementById('newBestLine').style.display = isNewBest ? 'block' : 'none';
+  document.getElementById('finalScore').textContent = finalScore;
+  document.getElementById('bestVal').textContent = Math.max(0,Math.floor(currentMode==='daily'?dailyBest:best));
+  if(isNewBest) Audio_.sfx.newBest();
+
+  // coins + unlocks
+  const earned = Math.floor(finalScore/8);
+  coins += earned;
+  document.getElementById('coinsEarnedLine').textContent = earned>0 ? ('🪙 +'+earned+' coins earned') : '';
+  const newlyUnlocked = [];
+  for(const id in SKINS){
+    if(!unlockedSkins.includes(id) && SKINS[id].cost>0 && coins >= SKINS[id].cost){
+      unlockedSkins.push(id);
+      newlyUnlocked.push(SKINS[id].name);
+    }
+  }
+  const toast = document.getElementById('unlockToast');
+  if(newlyUnlocked.length){
+    toast.textContent = '🔓 Unlocked: ' + newlyUnlocked.join(', ') + '!';
+    toast.classList.remove('hidden');
+    Audio_.sfx.unlock();
+  } else {
+    toast.classList.add('hidden');
+  }
+  await saveProgress();
+  updateCoinUI();
+  renderHangar();
+
+  document.getElementById('lbTitle').textContent = currentMode==='daily' ? "🏆 Today's Leaderboard" : '🏆 Leaderboard';
+  refreshLeaderboard();
+
+  overOverlay.classList.remove('hidden');
+}
+
+function updateHUD(){
+  document.getElementById('scoreVal').textContent = Math.max(0,Math.floor(score));
+  const bestToShow = currentMode==='daily' ? dailyBest : best;
+  document.getElementById('bestVal').textContent = Math.max(0,Math.floor(bestToShow));
+  const fill = document.getElementById('pooFill');
+  fill.style.width = pooCharge+'%';
+  fill.classList.toggle('full', pooCharge>=POO_MAX);
+  pooBtn.classList.toggle('ready', pooCharge>=POO_MAX);
+  if(pooCharge>=POO_MAX && !toastShown){
+    toastShown = true;
+    readyToast.classList.add('show');
+    setTimeout(()=>readyToast.classList.remove('show'), 1400);
+    Audio_.sfx.pooReady();
+  }
+}
+
+// ---------- landing prediction (for aiming reticle) ----------
+function predictLanding(){
+  const y0 = bird.y+6;
+  const c = y0 - (groundY-16);
+  if(c>=0) return {x:bird.x+10, t:0};
+  const a = 0.5*POO_G, b = POO_VY0;
+  const disc = b*b - 4*a*c;
+  const t = (-b + Math.sqrt(Math.max(0,disc))) / (2*a);
+  return {x: bird.x+10, t};
+}
+function targetAt(x){
+  for(const t of targets){ if(x > t.x - t.w/2 && x < t.x + t.w/2) return t; }
+  return null;
+}
+// Targets keep scrolling left (worldSpeed) for the ~1s the poo is in the air, so a target
+// sitting under the reticle right now will have drifted out from under it by the time the
+// poo actually lands — and a target further right can drift into the landing spot instead.
+// The reticle's ring position (a fixed screen x, since the bird doesn't move horizontally
+// and poo falls straight down) was always accurate, but the "+90 / MISS" preview was
+// checking targets' CURRENT position instead of where they'll actually be at landing time,
+// so the callout could promise a hit that had already scrolled away — this is what makes
+// the preview line up with what actually happens when the poo lands.
+function targetAtLanding(x, t){
+  for(const tg of targets){
+    const futureX = tg.x - worldSpeed*t;
+    if(x > futureX - tg.w/2 && x < futureX + tg.w/2) return tg;
+  }
+  return null;
+}
+
+// ---------- drawing ----------
+function drawCloudPuff(cx, cy, s){
+  // a single continuous bumpy outline (one closed bezier path) rather than three separate
+  // overlapping ellipses filled together — the old approach left thin triangular gaps where
+  // the ellipses' edges met but didn't fully overlap, showing tiny "holes" of sky through the
+  // cloud. One unbroken path has no internal seam for anything to show through.
+  ctx.beginPath();
+  ctx.moveTo(cx-s*1.0, cy+s*0.15);
+  ctx.bezierCurveTo(cx-s*1.35, cy-s*0.05, cx-s*1.15, cy-s*0.75, cx-s*0.5, cy-s*0.62);
+  ctx.bezierCurveTo(cx-s*0.32, cy-s*1.15, cx+s*0.4, cy-s*1.18, cx+s*0.58, cy-s*0.7);
+  ctx.bezierCurveTo(cx+s*1.25, cy-s*0.72, cx+s*1.4, cy-s*0.02, cx+s*0.92, cy+s*0.2);
+  ctx.bezierCurveTo(cx+s*1.05, cy+s*0.58, cx+s*0.45, cy+s*0.72, cx+s*0.12, cy+s*0.52);
+  ctx.bezierCurveTo(cx-s*0.28, cy+s*0.78, cx-s*0.9, cy+s*0.58, cx-s*1.0, cy+s*0.15);
+  ctx.closePath();
+  ctx.fill();
+}
+function drawSky(){
+  const g = ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0, scene.skyTop);
+  g.addColorStop(1, scene.skyBottom);
+  ctx.fillStyle = g;
+  ctx.fillRect(0,0,W,H);
+
+  // soft glowing corona behind the sun instead of one flat disc
+  ctx.save();
+  const sx = W*0.82, sy = H*0.16;
+  const glow = ctx.createRadialGradient(sx,sy,4, sx,sy,70);
+  glow.addColorStop(0, 'rgba(255,246,216,0.9)');
+  glow.addColorStop(0.5, 'rgba(255,246,216,0.28)');
+  glow.addColorStop(1, 'rgba(255,246,216,0)');
+  ctx.fillStyle = glow;
+  ctx.beginPath(); ctx.arc(sx, sy, 70, 0, Math.PI*2); ctx.fill();
+  ctx.globalAlpha = 0.9;
+  ctx.fillStyle = '#FFF6D8';
+  ctx.beginPath(); ctx.arc(sx, sy, 40, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+
+  // two drifting cloud layers (far, slow + near, a bit faster/bigger) — the sky used to be
+  // an empty gradient behind whatever scene decor was on screen; this gives every scene a
+  // bit of life without needing any per-scene special-casing.
+  // Each puff fades in/out tied to how much of its own width has actually crossed the
+  // screen edge - alpha=0 the instant the leading edge first touches the boundary, ramping
+  // to full only once the whole shape has crossed. A fade zone sized as an arbitrary
+  // constant (the first attempt at this) meant the puff was already 50-60% opaque the
+  // moment any of it became visible, which still read as a sudden reveal rather than a
+  // true fade from nothing.
+  function edgeFade(cx, halfWidth){
+    const span = halfWidth*2;
+    const rightFade = Math.min(1, Math.max(0, (W+halfWidth-cx)/span));
+    const leftFade = Math.min(1, Math.max(0, (cx+halfWidth)/span));
+    return Math.min(rightFade, leftFade);
+  }
+  ctx.save();
+  ctx.fillStyle = '#ffffff';
+  const farSpacing = 260, farOff = (elapsed*18)%farSpacing, farHalfWidth = 22*1.4;
+  for(let x=-farOff; x<W+80; x+=farSpacing){
+    const seed = Math.round((x+farOff)/farSpacing);
+    ctx.globalAlpha = 0.55*edgeFade(x, farHalfWidth);
+    drawCloudPuff(x, H*0.12 + (seed%3)*H*0.05, 22);
+  }
+  const nearSpacing = 210, nearOff = (elapsed*34)%nearSpacing, nearHalfWidth = 30*1.4;
+  for(let x=-nearOff; x<W+100; x+=nearSpacing){
+    const seed = Math.round((x+nearOff)/nearSpacing);
+    ctx.globalAlpha = 0.7*edgeFade(x, nearHalfWidth);
+    drawCloudPuff(x, H*0.22 + (seed%3)*H*0.06, 30);
+  }
+  ctx.restore();
+}
+
+// A thin sliver of sea right at the very bottom of the screen, well below the quay/prom
+// surface — just enough to signal there's water far down below street level, rather than a
+// tall band of open water floating up alongside the buildings (which is what Harbour's water
+// used to do before it read as the sea being level with, or higher than, the road).
+function drawShoreWaterStrip(){
+  const waterStripH = 14;
+  ctx.fillStyle = '#3E6B85';
+  ctx.fillRect(0, H-waterStripH, W, waterStripH);
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1.2;
+  const rippleSpacing = 30;
+  const rOff = (elapsed*worldSpeed*0.22)%rippleSpacing;
+  ctx.beginPath();
+  for(let x=-rOff; x<W+20; x+=rippleSpacing){
+    ctx.moveTo(x, H-waterStripH*0.55);
+    ctx.quadraticCurveTo(x+rippleSpacing*0.25, H-waterStripH*0.8, x+rippleSpacing*0.5, H-waterStripH*0.55);
+    ctx.quadraticCurveTo(x+rippleSpacing*0.75, H-waterStripH*0.3, x+rippleSpacing, H-waterStripH*0.55);
+  }
+  ctx.stroke();
+}
+function drawGround(){
+  ctx.fillStyle = scene.groundColor;
+  ctx.fillRect(0, groundY, W, H-groundY);
+  if(scene.decor==='beach'){
+    // shoreline foam line
+    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    const off = (elapsed*worldSpeed*0.3)%40;
+    for(let x=-off; x<W+20; x+=40){ ctx.moveTo(x,groundY+2); ctx.quadraticCurveTo(x+20,groundY+10,x+40,groundY+2); }
+    ctx.stroke();
+  } else if(scene.decor==='harbour'){
+    // wooden quay decking: plank seams running back from the edge, plus mooring bollards
+    // with a slack rope between them, instead of a plain road-style dashed line — this is
+    // what actually reads as "dock" rather than just another grey street
+    ctx.strokeStyle = 'rgba(0,0,0,0.14)'; ctx.lineWidth = 2;
+    const plankSpacing = 34;
+    const plankOff = (elapsed*worldSpeed)%plankSpacing;
+    ctx.beginPath();
+    for(let x=-plankOff; x<W+20; x+=plankSpacing){ ctx.moveTo(x, groundY+6); ctx.lineTo(x-8, H); }
+    ctx.stroke();
+    const postSpacing = 140;
+    const postOff = (elapsed*worldSpeed)%postSpacing;
+    const postXs = [];
+    for(let x=-postOff; x<W+20; x+=postSpacing) postXs.push(x);
+    ctx.strokeStyle = 'rgba(40,34,26,0.5)'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    for(let i=0;i<postXs.length-1;i++){
+      const x0=postXs[i], x1=postXs[i+1];
+      ctx.moveTo(x0, groundY-10); ctx.quadraticCurveTo((x0+x1)/2, groundY-2, x1, groundY-10);
+    }
+    ctx.stroke();
+    for(const x of postXs){
+      ctx.fillStyle = '#2A2E38';
+      ctx.fillRect(x-4, groundY-18, 8, 18);
+      ctx.beginPath(); ctx.arc(x, groundY-18, 5.5, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.15)';
+      ctx.beginPath(); ctx.arc(x-1.5, groundY-19.5, 2, 0, Math.PI*2); ctx.fill();
+    }
+    drawShoreWaterStrip();
+  } else if(scene.decor==='seaside'){
+    // painted promenade boardwalk: plank seams (no bollards/rope — that's Harbour's look)
+    // plus a painted white centre stripe, so it reads as a seafront prom rather than a road
+    ctx.strokeStyle = 'rgba(0,0,0,0.1)'; ctx.lineWidth = 2;
+    const plankSpacing = 30;
+    const plankOff = (elapsed*worldSpeed)%plankSpacing;
+    ctx.beginPath();
+    for(let x=-plankOff; x<W+20; x+=plankSpacing){ ctx.moveTo(x, groundY+4); ctx.lineTo(x, H); }
+    ctx.stroke();
+    ctx.fillStyle = scene.groundLine;
+    const off = (elapsed*worldSpeed)%40;
+    for(let x=-off; x<W; x+=40){ ctx.fillRect(x, groundY+16, 22, 3); }
+    // same low, distant sliver of sea as Harbour — the seafront prom sits above the beach/
+    // shoreline too, so it gets the same "water's down there, below street level" cue
+    drawShoreWaterStrip();
+  } else {
+    ctx.fillStyle = scene.groundLine;
+    const off = (elapsed*worldSpeed)%40;
+    for(let x=-off; x<W; x+=40){ ctx.fillRect(x, groundY+18, 20, 4); }
+  }
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  ctx.fillRect(0, groundY, W, 6);
+}
+
+// Harbour-only water backdrop: a horizontal band of water with a ripple texture and a few
+// bobbing boats, drawn BEHIND the dockside warehouses (decorFar) so it only peeks through
+// the gaps between buildings — the missing "there's actually water here" cue that made the
+// scene read as generic buildings-and-cranes instead of a harbour.
+// Previously this scene had a tall band of open sea (drawHarbourWater/drawHarbourBoat)
+// floating behind the buildings, well above the quay's own ground line — which read as the
+// sea being level with, or even higher than, the dock itself. The quay is meant to stand
+// above the waterline, so that band was removed; a thin, distant sliver of sea is now drawn
+// right at the very bottom edge of the canvas instead (see drawGround's harbour branch),
+// low enough to read as "far below the dock" rather than floating alongside it.
+
+// Custom vector art for the 5 universal ground targets, drawn centered at the origin at
+// roughly badge-ring scale (r). Deliberately few types with real shapes, rather than the
+// old 20-plus-emoji spread — a person silhouette is reused (recolored/reposed) across
+// jogger/pram/crowd so they read as a coherent family rather than unrelated stickers.
+function drawPersonShape(r, shirt, skin, legOffset){
+  // simple walking-person silhouette: head, torso, two legs mid-stride, one swinging arm
+  const headR = r*0.22;
+  ctx.fillStyle = skin;
+  ctx.beginPath(); ctx.arc(0, -r*0.72, headR, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = shirt;
+  ctx.beginPath();
+  ctx.moveTo(-r*0.22, -r*0.5);
+  ctx.lineTo(r*0.22, -r*0.5);
+  ctx.lineTo(r*0.16, r*0.05);
+  ctx.lineTo(-r*0.16, r*0.05);
+  ctx.closePath(); ctx.fill();
+  // legs (mid-stride: one forward, one back)
+  ctx.strokeStyle = '#2A2E38'; ctx.lineWidth = r*0.13; ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(-r*0.06, r*0.02); ctx.lineTo(-r*0.06-legOffset, r*0.55);
+  ctx.moveTo(r*0.06, r*0.02); ctx.lineTo(r*0.06+legOffset, r*0.5);
+  ctx.stroke();
+  // one swinging arm
+  ctx.strokeStyle = skin; ctx.lineWidth = r*0.1;
+  ctx.beginPath(); ctx.moveTo(r*0.14,-r*0.42); ctx.lineTo(r*0.32,-r*0.1); ctx.stroke();
+}
+function drawCarArt(r){
+  const w = r*1.15, h = r*0.62, bodyY = -h*0.15;
+  ctx.fillStyle = '#D6483E';
+  ctx.beginPath();
+  ctx.moveTo(-w+6, bodyY-h*0.5);
+  ctx.lineTo(w-6, bodyY-h*0.5);
+  ctx.quadraticCurveTo(w, bodyY-h*0.5, w, bodyY-h*0.2);
+  ctx.lineTo(w, bodyY+h*0.5);
+  ctx.lineTo(-w, bodyY+h*0.5);
+  ctx.lineTo(-w, bodyY-h*0.2);
+  ctx.quadraticCurveTo(-w, bodyY-h*0.5, -w+6, bodyY-h*0.5);
+  ctx.closePath(); ctx.fill();
+  // cabin
+  ctx.fillStyle = '#B83A31';
+  ctx.beginPath();
+  ctx.moveTo(-w*0.35, bodyY-h*0.5);
+  ctx.lineTo(w*0.3, bodyY-h*0.5);
+  ctx.lineTo(w*0.15, bodyY-h*1.05);
+  ctx.lineTo(-w*0.2, bodyY-h*1.05);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = 'rgba(190,222,235,0.85)';
+  ctx.fillRect(-w*0.14, bodyY-h*0.98, w*0.4, h*0.42);
+  ctx.fillStyle = '#20242A';
+  ctx.beginPath(); ctx.arc(-w*0.55, bodyY+h*0.5, r*0.16, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(w*0.55, bodyY+h*0.5, r*0.16, 0, Math.PI*2); ctx.fill();
+}
+function drawFlashyCarArt(r){
+  // lower, wider, sportier than the plain car — racing stripe, spoiler, gold rims
+  const w = r*1.2, h = r*0.5, bodyY = -h*0.05;
+  ctx.fillStyle = '#F2C230';
+  ctx.beginPath();
+  ctx.moveTo(-w+4, bodyY-h*0.4);
+  ctx.lineTo(w-10, bodyY-h*0.4);
+  ctx.quadraticCurveTo(w, bodyY-h*0.4, w, bodyY);
+  ctx.lineTo(w-4, bodyY+h*0.55);
+  ctx.lineTo(-w, bodyY+h*0.55);
+  ctx.lineTo(-w, bodyY-h*0.1);
+  ctx.quadraticCurveTo(-w, bodyY-h*0.4, -w+4, bodyY-h*0.4);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#2A2E38';
+  ctx.fillRect(-w*0.9, bodyY-h*0.32, w*1.7, h*0.22);
+  // low sloped cabin
+  ctx.fillStyle = '#C99A1E';
+  ctx.beginPath();
+  ctx.moveTo(-w*0.3, bodyY-h*0.4);
+  ctx.lineTo(w*0.35, bodyY-h*0.4);
+  ctx.lineTo(w*0.05, bodyY-h*0.95);
+  ctx.lineTo(-w*0.1, bodyY-h*0.95);
+  ctx.closePath(); ctx.fill();
+  // spoiler
+  ctx.fillStyle = '#2A2E38';
+  ctx.fillRect(-w*1.02, bodyY-h*0.55, r*0.14, h*0.55);
+  ctx.fillRect(-w*1.05, bodyY-h*0.62, w*0.32, h*0.16);
+  ctx.fillStyle = '#20242A';
+  ctx.beginPath(); ctx.arc(-w*0.5, bodyY+h*0.55, r*0.17, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(w*0.5, bodyY+h*0.55, r*0.17, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = 'rgba(255,214,90,0.85)';
+  ctx.beginPath(); ctx.arc(-w*0.5, bodyY+h*0.55, r*0.07, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(w*0.5, bodyY+h*0.55, r*0.07, 0, Math.PI*2); ctx.fill();
+}
+function drawJoggerArt(r){
+  ctx.save(); ctx.translate(0, r*0.15);
+  drawPersonShape(r*1.35, '#2E8B77', '#F0C29A', r*0.28);
+  ctx.restore();
+}
+function drawPramArt(r){
+  // a parent figure pushing a small two-wheeled pram out in front
+  ctx.save(); ctx.translate(-r*0.18, r*0.15);
+  drawPersonShape(r*1.15, '#6C5CBF', '#EAB68C', r*0.16);
+  ctx.restore();
+  ctx.save(); ctx.translate(r*0.48, r*0.32);
+  // handle bar back to the parent's hand
+  ctx.strokeStyle = '#8A7B4E'; ctx.lineWidth = r*0.08; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(-r*0.15,-r*0.28); ctx.lineTo(r*0.1,-r*0.5); ctx.stroke();
+  // basket body
+  ctx.fillStyle = '#F2B6C6';
+  ctx.beginPath();
+  ctx.moveTo(-r*0.02,-r*0.5);
+  ctx.quadraticCurveTo(r*0.55,-r*0.55, r*0.58,-r*0.1);
+  ctx.lineTo(r*0.5, r*0.12);
+  ctx.lineTo(r*0.02, r*0.1);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.beginPath(); ctx.ellipse(r*0.28,-r*0.32, r*0.16, r*0.08, -0.3, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#3A3F4B';
+  ctx.beginPath(); ctx.arc(r*0.08, r*0.22, r*0.11, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(r*0.46, r*0.22, r*0.11, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+function drawCrowdArt(r){
+  // three reused person silhouettes at slightly different heights/colors/x-offsets
+  const people = [
+    {x:-r*0.62, scale:0.82, shirt:'#3E7BC4', skin:'#EAB68C', leg:r*0.18},
+    {x:0,        scale:1.0,  shirt:'#D6483E', skin:'#F0C29A', leg:r*0.22},
+    // deliberately not green — the badge disc behind every target is already this same
+    // green, so a green shirt here would nearly disappear against it
+    {x:r*0.62,  scale:0.88, shirt:'#C9A24B', skin:'#C88F63', leg:r*0.2},
+  ];
+  for(const p of people){
+    ctx.save();
+    ctx.translate(p.x, r*(1-p.scale)*0.5);
+    ctx.scale(p.scale, p.scale);
+    drawPersonShape(r*0.85, p.shirt, p.skin, p.leg);
+    ctx.restore();
+  }
+}
+// One-off scene-exclusive target art (see SCENE_SPECIALS) — each of these is a genuine
+// unique prop rather than a recolor of the universal 5, so every scene has one thing you
+// won't see anywhere else.
+function drawPicnicArt(r){
+  // a picnic table (planked top + benches) with three simplified seated figures around it
+  const tableW = r*1.5, tableH = r*0.5;
+  ctx.fillStyle = '#8A6339';
+  ctx.fillRect(-tableW/2, -tableH/2, tableW, tableH);
+  ctx.strokeStyle = 'rgba(0,0,0,0.22)'; ctx.lineWidth = 1;
+  ctx.beginPath();
+  for(let x=-tableW/2+6; x<tableW/2; x+=8){ ctx.moveTo(x,-tableH/2); ctx.lineTo(x,tableH/2); }
+  ctx.stroke();
+  ctx.fillStyle = '#6E4E2A';
+  ctx.fillRect(-tableW*0.44, -tableH*1.35, tableW*0.88, tableH*0.34);
+  ctx.fillRect(-tableW*0.44, tableH*1.02, tableW*0.88, tableH*0.34);
+  const people = [
+    {x:-tableW*0.26, y:-tableH*1.5, shirt:'#D6483E', skin:'#EAB68C'},
+    {x:tableW*0.14,  y:-tableH*1.5, shirt:'#3E7BC4', skin:'#F0C29A'},
+    // not green — would nearly vanish against the green badge disc behind it
+    {x:0,            y:tableH*1.5,  shirt:'#C9A24B', skin:'#C88F63'},
+  ];
+  for(const p of people){
+    ctx.fillStyle = p.skin;
+    ctx.beginPath(); ctx.arc(p.x, p.y-r*0.24, r*0.15, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = p.shirt;
+    ctx.beginPath(); ctx.ellipse(p.x, p.y, r*0.19, r*0.24, 0, 0, Math.PI*2); ctx.fill();
+  }
+}
+function drawSandcastleArt(r){
+  const baseW = r*1.3, wallTop = r*0.05;
+  ctx.fillStyle = '#E3C583';
+  ctx.fillRect(-baseW/2, wallTop, baseW, r*0.55);
+  ctx.fillStyle = '#D9B36E';
+  for(let i=0;i<5;i++){ ctx.fillRect(-baseW/2 + i*(baseW/5), wallTop-r*0.12, baseW/5*0.6, r*0.12); }
+  for(const tx of [-baseW*0.33, baseW*0.33]){
+    ctx.fillStyle = '#E3C583';
+    ctx.fillRect(tx-r*0.15, wallTop-r*0.55, r*0.3, r*0.55);
+    ctx.beginPath();
+    ctx.moveTo(tx-r*0.19, wallTop-r*0.55); ctx.lineTo(tx+r*0.19, wallTop-r*0.55); ctx.lineTo(tx, wallTop-r*0.82);
+    ctx.closePath(); ctx.fill();
+  }
+  ctx.fillStyle = 'rgba(90,60,30,0.5)';
+  ctx.beginPath(); ctx.arc(0, wallTop+r*0.55, r*0.15, Math.PI, 0); ctx.fill();
+  ctx.strokeStyle = '#5C4326'; ctx.lineWidth = 1.3;
+  ctx.beginPath(); ctx.moveTo(0, wallTop-r*0.82); ctx.lineTo(0, wallTop-r*1.02); ctx.stroke();
+  ctx.fillStyle = '#E0483E';
+  ctx.beginPath(); ctx.moveTo(0, wallTop-r*1.02); ctx.lineTo(r*0.2, wallTop-r*0.94); ctx.lineTo(0, wallTop-r*0.86); ctx.closePath(); ctx.fill();
+}
+function drawSealBuoyArt(r){
+  // mooring buoy: white body with a red band top and bottom, pushed low so it stays visible
+  // underneath the seal instead of getting fully hidden by it
+  const buoyW = r*0.62, buoyH = r*0.95, buoyY = r*0.32;
+  ctx.fillStyle = '#F5F5F0';
+  ctx.beginPath(); ctx.ellipse(0, buoyY, buoyW*0.5, buoyH*0.5, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#D6483E';
+  ctx.beginPath(); ctx.ellipse(0, buoyY-buoyH*0.3, buoyW*0.5, buoyH*0.2, 0, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0, buoyY+buoyH*0.3, buoyW*0.5, buoyH*0.2, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#B33A2E';
+  ctx.beginPath(); ctx.ellipse(0, buoyY-buoyH*0.48, buoyW*0.32, buoyH*0.12, 0, 0, Math.PI*2); ctx.fill();
+  // seal balanced on top: a body with belly shading, a clearly separate rounder head with a
+  // snout, eye and a small flipper — the earlier version was one grey blob that mostly just
+  // hid the buoy underneath it and didn't read as an animal at all
+  const bodyY = -r*0.2;
+  ctx.fillStyle = '#9BA0A8';
+  ctx.beginPath(); ctx.ellipse(0, bodyY, r*0.5, r*0.24, -0.05, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#7D828B';
+  ctx.beginPath(); ctx.ellipse(-r*0.02, bodyY+r*0.08, r*0.42, r*0.12, -0.05, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#9BA0A8';
+  ctx.beginPath(); ctx.ellipse(r*0.42, bodyY-r*0.1, r*0.2, r*0.17, 0.15, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#5C6067';
+  ctx.beginPath(); ctx.ellipse(r*0.57, bodyY-r*0.04, r*0.05, r*0.035, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#20242A';
+  ctx.beginPath(); ctx.arc(r*0.46, bodyY-r*0.16, r*0.028, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#7D828B';
+  ctx.beginPath(); ctx.ellipse(-r*0.5, bodyY+r*0.02, r*0.16, r*0.08, -0.35, 0, Math.PI*2); ctx.fill();
+}
+function drawHotdogCartArt(r){
+  const cartW = r*1.3, cartH = r*0.62, bodyY = r*0.22;
+  ctx.fillStyle = '#FFD866';
+  ctx.beginPath();
+  ctx.moveTo(-cartW*0.62, bodyY-cartH*0.5-r*0.06); ctx.lineTo(cartW*0.62, bodyY-cartH*0.5-r*0.06);
+  ctx.lineTo(cartW*0.32, bodyY-cartH*0.5-r*0.48); ctx.lineTo(-cartW*0.32, bodyY-cartH*0.5-r*0.48);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#E0483E';
+  ctx.beginPath();
+  ctx.moveTo(-cartW*0.16, bodyY-cartH*0.5-r*0.06); ctx.lineTo(cartW*0.16, bodyY-cartH*0.5-r*0.06);
+  ctx.lineTo(cartW*0.08, bodyY-cartH*0.5-r*0.48); ctx.lineTo(-cartW*0.08, bodyY-cartH*0.5-r*0.48);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = '#8A6339'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0, bodyY-cartH*0.5-r*0.06); ctx.lineTo(0, bodyY-cartH*0.5); ctx.stroke();
+  ctx.fillStyle = '#C0392B';
+  ctx.fillRect(-cartW/2, bodyY-cartH*0.5, cartW, cartH);
+  ctx.fillStyle = 'rgba(190,222,235,0.75)';
+  ctx.fillRect(-cartW*0.32, bodyY-cartH*0.22, cartW*0.64, cartH*0.42);
+  ctx.fillStyle = '#20242A';
+  ctx.beginPath(); ctx.arc(-cartW*0.28, bodyY+cartH*0.5, r*0.13, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cartW*0.28, bodyY+cartH*0.5, r*0.13, 0, Math.PI*2); ctx.fill();
+}
+function drawIceCreamVanArt(r){
+  const vanW = r*1.3, vanH = r*0.62, bodyY = r*0.2;
+  ctx.fillStyle = '#F5F0E6';
+  ctx.beginPath();
+  ctx.moveTo(-vanW*0.5, bodyY+vanH*0.5); ctx.lineTo(-vanW*0.5, bodyY-vanH*0.14);
+  ctx.lineTo(-vanW*0.26, bodyY-vanH*0.5); ctx.lineTo(vanW*0.5, bodyY-vanH*0.5);
+  ctx.lineTo(vanW*0.5, bodyY+vanH*0.5); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#7FC7E0';
+  ctx.fillRect(-vanW*0.5, bodyY+vanH*0.06, vanW, vanH*0.2);
+  ctx.fillStyle = 'rgba(190,222,235,0.85)';
+  ctx.fillRect(vanW*0.02, bodyY-vanH*0.38, vanW*0.4, vanH*0.38);
+  ctx.fillStyle = '#FFD866';
+  ctx.beginPath();
+  ctx.moveTo(-vanW*0.06, bodyY-vanH*0.5-r*0.02); ctx.lineTo(vanW*0.06, bodyY-vanH*0.5-r*0.02);
+  ctx.lineTo(0, bodyY-vanH*0.5-r*0.2); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#F5FAFF';
+  ctx.beginPath(); ctx.arc(0, bodyY-vanH*0.5-r*0.26, r*0.085, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#20242A';
+  ctx.beginPath(); ctx.arc(-vanW*0.28, bodyY+vanH*0.5, r*0.14, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(vanW*0.22, bodyY+vanH*0.5, r*0.14, 0, Math.PI*2); ctx.fill();
+}
+const TARGET_ART = {
+  car:drawCarArt, flashyCar:drawFlashyCarArt, jogger:drawJoggerArt, pram:drawPramArt, crowd:drawCrowdArt,
+  picnic:drawPicnicArt, sandcastle:drawSandcastleArt, sealBuoy:drawSealBuoyArt,
+  hotdogCart:drawHotdogCartArt, iceCreamVan:drawIceCreamVanArt
+};
+
+function drawTarget(t){
+  // a gentle idle bob so targets feel alive rather than pinned in place
+  t.bobPhase = (t.bobPhase||0) + 0.045;
+  const cy = groundY - 20 + Math.sin(t.bobPhase)*3*t.sizeMul;
+  ctx.save();
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  const ringR = t.ringR;
+
+  // soft contact shadow on the ground beneath — the single cheapest cue that these are
+  // sitting/hovering in the scene rather than pasted flat on top of it
+  ctx.globalAlpha = 0.22;
+  ctx.beginPath();
+  ctx.ellipse(t.x, groundY-2, ringR*0.85, ringR*0.28, 0, 0, Math.PI*2);
+  ctx.fillStyle = '#000';
+  ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // badge disc with a real light source (radial gradient) instead of a flat fill, plus a
+  // thin gold rim so it reads as a collectible coin/medallion rather than a plain circle —
+  // this is what "spruces up" every emoji target uniformly without needing bespoke art
+  // for two dozen different ground objects
+  const baseColor = t.good ? '#3FA34D' : '#E0483E';
+  const hiColor = t.good ? '#6FD37E' : '#F27A70';
+  const loColor = t.good ? '#227A32' : '#A82E24';
+  const grad = ctx.createRadialGradient(t.x-ringR*0.35, cy-ringR*0.4, ringR*0.15, t.x, cy, ringR);
+  grad.addColorStop(0, hiColor);
+  grad.addColorStop(0.6, baseColor);
+  grad.addColorStop(1, loColor);
+  ctx.beginPath();
+  ctx.arc(t.x, cy, ringR, 0, Math.PI*2);
+  ctx.fillStyle = grad;
+  ctx.fill();
+  ctx.lineWidth = 1.6;
+  ctx.strokeStyle = 'rgba(255,214,90,0.75)';
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(t.x, cy, ringR-2.2, 0, Math.PI*2);
+  ctx.lineWidth = 1.4;
+  ctx.strokeStyle = 'rgba(31,36,48,0.5)';
+  ctx.stroke();
+
+  // custom vector art, clipped to the badge disc so nothing spills past its edge
+  ctx.save();
+  ctx.beginPath(); ctx.arc(t.x, cy, ringR-1.5, 0, Math.PI*2); ctx.clip();
+  const artFn = TARGET_ART[t.art];
+  if(artFn){
+    const scale = ringR/TARGET_RING_BASE;
+    ctx.translate(t.x, cy);
+    ctx.scale(scale, scale);
+    artFn(TARGET_RING_BASE);
+  }
+  ctx.restore();
+
+  // points chip instead of the old generic thumbs-up badge — ties the visual directly to
+  // the score it awards, tucked at the ring's edge
+  const chipW = 8+String(t.pts).length*6.5, chipH = 13;
+  const chipX = t.x + ringR*0.62, chipY = cy - ringR*0.85;
+  ctx.beginPath();
+  ctx.moveTo(chipX-chipW/2+3, chipY-chipH/2);
+  ctx.arcTo(chipX+chipW/2, chipY-chipH/2, chipX+chipW/2, chipY+chipH/2, 3);
+  ctx.arcTo(chipX+chipW/2, chipY+chipH/2, chipX-chipW/2, chipY+chipH/2, 3);
+  ctx.arcTo(chipX-chipW/2, chipY+chipH/2, chipX-chipW/2, chipY-chipH/2, 3);
+  ctx.arcTo(chipX-chipW/2, chipY-chipH/2, chipX+chipW/2, chipY-chipH/2, 3);
+  ctx.closePath();
+  ctx.fillStyle = '#1F2430';
+  ctx.fill();
+  ctx.font = '700 10px sans-serif';
+  ctx.fillStyle = '#FFD866';
+  ctx.fillText(t.pts, chipX, chipY+1);
+
+  if(t.sparkle){
+    t.sparklePhase += 0.12;
+    const s=(Math.sin(t.sparklePhase)+1)/2;
+    ctx.globalAlpha = 0.6+s*0.4;
+    ctx.font='16px sans-serif';
+    ctx.fillText('✨', t.x-18, cy-18);
+    ctx.globalAlpha=1;
+  }
+  ctx.restore();
+}
+
+// Custom vector art for each obstacle type, drawn at local origin (already translated to
+// o.x,o.y and rotated for bank where relevant) — replaces the old plain emoji glyph so the
+// "evil" obstacles hold their own visually against the fully hand-drawn gull, instead of
+// looking like a flat sticker next to a proper little painting.
+function drawKiteArt(r){
+  // diamond sail split into four panels (two-tone, so it reads as a real kite, not a blob),
+  // a jagged tattered edge instead of dead-straight lines, a crossed wooden spar, and a
+  // ribboned tail trailing behind (kites drift right-to-left, so the tail trails right)
+  const pts = [[0,-r*1.15],[r*0.95,0],[0,r*1.15],[-r*0.95,0]];
+  function panel(a,b,color){
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.lineTo(a[0]*0.5,a[1]*0.5);
+    // small jag partway along the edge for a torn-cloth feel
+    const jx=(a[0]+b[0])*0.28, jy=(a[1]+b[1])*0.28;
+    ctx.lineTo(jx*1.08, jy*1.08);
+    ctx.lineTo(b[0]*0.5,b[1]*0.5);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+  }
+  // brightened from a dark maroon/near-black two-tone (which blended into the sky, especially
+  // lighter scenes) to a bold red/yellow two-tone — still reads as a kite, but pops against sky now
+  panel(pts[0],pts[1],'#E8362B');
+  panel(pts[1],pts[2],'#FFC93C');
+  panel(pts[2],pts[3],'#E8362B');
+  panel(pts[3],pts[0],'#FFC93C');
+  ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.moveTo(0,-r*1.15); ctx.lineTo(0,r*1.15); ctx.moveTo(-r*0.95,0); ctx.lineTo(r*0.95,0); ctx.stroke();
+  // spar frame
+  ctx.strokeStyle = '#5C4326'; ctx.lineWidth = 1.6;
+  ctx.beginPath(); ctx.moveTo(0,-r*1.15); ctx.lineTo(0,r*1.15); ctx.moveTo(-r*0.95,0); ctx.lineTo(r*0.95,0); ctx.stroke();
+  // ribbon tail with little bows
+  ctx.strokeStyle = '#5C4326'; ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.moveTo(0,r*1.15); ctx.quadraticCurveTo(r*0.6,r*1.6,r*0.3,r*2.1); ctx.stroke();
+  for(let i=0;i<3;i++){
+    const bx = r*0.55 - i*r*0.1, by = r*1.5 + i*r*0.35;
+    ctx.fillStyle = i%2===0 ? '#C0392B' : '#2A2E38';
+    ctx.beginPath(); ctx.ellipse(bx,by,r*0.16,r*0.09,0.5,0,Math.PI*2); ctx.fill();
+  }
+}
+function drawBirdArt(r, big){
+  // Both bird-obstacle tiers are eagles now, full stop — you asked to drop the separate
+  // "crow" species entirely rather than keep tuning it. The smaller/faster tier (big:false) is
+  // a young golden eagle (mottled dark-brown head, tawny highlights, not yet white-headed); the
+  // bigger tier (big:true) is a full adult bald eagle (white head, dark brown body). Same
+  // species, same silhouette, just plumage and scale — like a real eagle at two ages, not two
+  // different animals. The old wing (a handful of small notches along one curve) is replaced
+  // with actual spread "finger" primary feathers — the fanned wingtip that's the single most
+  // recognizable feature of a soaring eagle's silhouette — and the tail is now three distinct
+  // feathers instead of one solid wedge.
+  const bodyColor   = big ? '#3E2B1E' : '#5C4630';
+  const darkColor   = big ? '#241609' : '#2E2013';
+  const headColor   = big ? '#F5EFDF' : '#6E4E2C';
+  const headFleck   = big ? '#E4DAC0' : '#8A6438'; // subtle plumage mottling on the head
+  const beakColor   = big ? '#F0B23C' : '#D99A32';
+  const browColor   = darkColor;
+  const eyeSocket   = '#1A1108';
+
+  // tail — three individual overlapping feathers fanning out behind the body, not one solid wedge
+  ctx.fillStyle = darkColor;
+  for(const t of [-0.34, 0, 0.34]){
+    ctx.beginPath();
+    ctx.moveTo(-r*0.5, t*r*0.4);
+    ctx.lineTo(-r*1.25, t*r*0.95 - r*0.02);
+    ctx.lineTo(-r*1.08, t*r*0.95 + r*0.14);
+    ctx.lineTo(-r*0.42, t*r*0.4 + r*0.12);
+    ctx.closePath(); ctx.fill();
+  }
+
+  // body — a smooth teardrop, tapering toward the tail rather than a plain round blob
+  ctx.fillStyle = bodyColor;
+  ctx.beginPath();
+  ctx.ellipse(-r*0.1, r*0.08, r*0.64, r*0.45, 0.1, 0, Math.PI*2);
+  ctx.fill();
+  // a couple of soft chest-feather highlights for a bit of plumage texture, not a flat fill
+  ctx.fillStyle = big ? 'rgba(255,255,255,0.08)' : 'rgba(220,180,120,0.16)';
+  ctx.beginPath(); ctx.ellipse(-r*0.02, r*0.18, r*0.38, r*0.2, 0.15, 0, Math.PI*2); ctx.fill();
+
+  // wing — swept back with spread "finger" primary feathers at the tip, the classic
+  // soaring-eagle silhouette, instead of a smooth curve with a few notches cut into the edge
+  const wristX = -r*0.72, wristY = -r*0.34;
+  ctx.fillStyle = darkColor;
+  ctx.beginPath();
+  ctx.moveTo(r*0.1, -r*0.06);
+  ctx.quadraticCurveTo(-r*0.3, -r*0.5, wristX, wristY);
+  const fingerAngles = [0.05, 0.32, 0.58, 0.84, 1.08];
+  for(let i=0;i<fingerAngles.length;i++){
+    const a = fingerAngles[i];
+    const len = r*(0.85 - i*0.03);
+    const tipX = wristX - Math.cos(a)*len, tipY = wristY - Math.sin(a)*len*0.7 + r*0.05;
+    ctx.lineTo(tipX, tipY);
+    const nextA = fingerAngles[i+1] !== undefined ? (a+fingerAngles[i+1])/2 : a+0.16;
+    const notchLen = len*0.62;
+    const notchX = wristX - Math.cos(nextA)*notchLen, notchY = wristY - Math.sin(nextA)*notchLen*0.7 + r*0.09;
+    ctx.lineTo(notchX, notchY);
+  }
+  ctx.quadraticCurveTo(-r*0.35, r*0.22, r*0.1, -r*0.06);
+  ctx.closePath();
+  ctx.fill();
+  // a lighter covert-feather band along the wing's leading edge for a bit of depth
+  ctx.fillStyle = big ? 'rgba(255,255,255,0.1)' : 'rgba(220,180,120,0.14)';
+  ctx.beginPath();
+  ctx.moveTo(r*0.02,-r*0.08); ctx.quadraticCurveTo(-r*0.28,-r*0.42, wristX+r*0.08, wristY+r*0.04);
+  ctx.quadraticCurveTo(-r*0.3,-r*0.16, r*0.02,-r*0.08);
+  ctx.closePath(); ctx.fill();
+
+  // head — its own rounded shape at the front, distinct from the body outline
+  ctx.fillStyle = headColor;
+  ctx.beginPath(); ctx.ellipse(r*0.54, -r*0.15, r*0.33, r*0.29, 0, 0, Math.PI*2); ctx.fill();
+  // plumage mottling flecks on the head so it doesn't read as one flat color patch
+  ctx.fillStyle = headFleck;
+  ctx.beginPath(); ctx.ellipse(r*0.42,-r*0.06, r*0.09, r*0.06, 0.3, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(r*0.62,-r*0.24, r*0.08, r*0.05, -0.2, 0, Math.PI*2); ctx.fill();
+  // fierce brow ridge, angled down over the eye like a real raptor
+  ctx.fillStyle = browColor;
+  ctx.beginPath();
+  ctx.moveTo(r*0.35,-r*0.24); ctx.lineTo(r*0.72,-r*0.36); ctx.lineTo(r*0.68,-r*0.22); ctx.lineTo(r*0.36,-r*0.14);
+  ctx.closePath(); ctx.fill();
+  // glowing red eye, drawn right here on the actual head instead of the old generic symmetric
+  // pair drawObstacle used to stamp over every obstacle regardless of its shape — that pair
+  // landed over the wing/body on this bird once it had a real head to compare against, which
+  // read as stray floating dots. This one sits exactly where the eye belongs, under the brow.
+  ctx.fillStyle = eyeSocket;
+  ctx.beginPath(); ctx.ellipse(r*0.5,-r*0.14, r*0.1, r*0.09, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = 'rgba(255,59,48,0.4)';
+  ctx.beginPath(); ctx.arc(r*0.5,-r*0.14, r*0.09, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#FF3B30';
+  ctx.beginPath(); ctx.arc(r*0.5,-r*0.14, r*0.05, 0, Math.PI*2); ctx.fill();
+  // strong hooked beak — deeper hook and a visible nostril for a more predatory profile
+  ctx.fillStyle = beakColor;
+  ctx.beginPath();
+  ctx.moveTo(r*0.78,-r*0.2); ctx.lineTo(r*1.28,-r*0.03); ctx.lineTo(r*0.98,r*0.02); ctx.lineTo(r*0.82,r*0.13); ctx.lineTo(r*0.94,-r*0.04);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = darkColor;
+  ctx.beginPath(); ctx.ellipse(r*0.92,-r*0.08, r*0.035, r*0.025, 0, 0, Math.PI*2); ctx.fill();
+}
+function drawPlaneArt(r){
+  // Previously a wide flat oval fuselage with a domed "cockpit" and two red eye-dots glowing on
+  // top of it — plus the nose/tail geometry was actually backwards (the tail fin was drawn
+  // further toward the nose than the cockpit was), which between the wrong proportions, the
+  // wrong ends, and the red dots is exactly why it read as a UFO instead of a plane. Rebuilt
+  // from scratch as an actual 3/4-view aircraft silhouette (the classic paper-airplane-emoji
+  // shape): a slender fuselage that tapers to a pointed nose, wings swept back from the middle
+  // of the body toward the tail, a proper tail assembly (vertical fin plus small horizontal
+  // stabilizers) at the rear, a row of cabin windows, and no glowing eyes anywhere on it — the
+  // danger cue for the plane is now just its size, speed, and the shared skull badge.
+  const metal = '#C7CDD4', metalDark = '#8A929C', metalShade = '#5C636C';
+  const stripe = '#C0392B', windowColor = 'rgba(120,180,210,0.9)';
+
+  // wings — swept back from mid-fuselage toward the tail, clearly extending past the body on
+  // both sides (drawn before the fuselage so the body sits on top of the wing roots)
+  ctx.fillStyle = metalDark;
+  ctx.beginPath();
+  ctx.moveTo(r*0.15, -r*0.08); ctx.lineTo(-r*0.55, -r*1.0); ctx.lineTo(-r*0.85, -r*0.9); ctx.lineTo(-r*0.25, -r*0.05);
+  ctx.closePath(); ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(r*0.15, r*0.08); ctx.lineTo(-r*0.55, r*1.0); ctx.lineTo(-r*0.85, r*0.9); ctx.lineTo(-r*0.25, r*0.05);
+  ctx.closePath(); ctx.fill();
+
+  // tail assembly at the rear — a vertical fin plus two small horizontal stabilizers, not just
+  // one lone triangle stuck on the wrong end
+  ctx.fillStyle = metalShade;
+  ctx.beginPath();
+  ctx.moveTo(-r*0.8, 0); ctx.lineTo(-r*1.3, -r*0.4); ctx.lineTo(-r*1.0, -r*0.02);
+  ctx.closePath(); ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(-r*0.78, -r*0.04); ctx.lineTo(-r*1.08, -r*0.26); ctx.lineTo(-r*0.9, -r*0.02);
+  ctx.closePath(); ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(-r*0.78, r*0.04); ctx.lineTo(-r*1.08, r*0.26); ctx.lineTo(-r*0.9, r*0.02);
+  ctx.closePath(); ctx.fill();
+
+  // fuselage — a slender tapered body instead of a wide flat oval, pointed at the nose
+  ctx.fillStyle = metal;
+  ctx.beginPath();
+  ctx.moveTo(r*1.25, 0);
+  ctx.quadraticCurveTo(r*0.85, -r*0.22, -r*0.35, -r*0.17);
+  ctx.quadraticCurveTo(-r*0.95, -r*0.13, -r*1.0, 0);
+  ctx.quadraticCurveTo(-r*0.95, r*0.13, -r*0.35, r*0.17);
+  ctx.quadraticCurveTo(r*0.85, r*0.22, r*1.25, 0);
+  ctx.closePath(); ctx.fill();
+
+  // danger stripe running the length of the fuselage
+  ctx.fillStyle = stripe;
+  ctx.fillRect(-r*0.85, -r*0.05, r*1.85, r*0.1);
+
+  // a row of small cabin windows — the single detail that most says "this is a plane"
+  ctx.fillStyle = windowColor;
+  for(let i=0;i<4;i++){
+    ctx.beginPath();
+    ctx.arc(r*0.42 - i*r*0.3, -r*0.14, r*0.045, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  // cockpit windshield near the nose
+  ctx.fillStyle = 'rgba(150,210,235,0.9)';
+  ctx.beginPath(); ctx.ellipse(r*0.92, -r*0.02, r*0.15, r*0.09, 0, 0, Math.PI*2); ctx.fill();
+
+  // engine exhaust glow at the tail, where the contrail actually trails from
+  ctx.fillStyle = 'rgba(255,150,60,0.75)';
+  ctx.beginPath(); ctx.ellipse(-r*1.0, 0, r*0.1, r*0.1, 0, 0, Math.PI*2); ctx.fill();
+}
+
+function drawObstacle(o){
+  o.pulsePhase = (o.pulsePhase||0) + 0.15;
+  const pulse = (Math.sin(o.pulsePhase)+1)/2; // 0..1
+  const isPlane = o.key==='plane';
+  const isEagle = o.key==='eagle';
+  const isBirdOfPrey = o.key==='bird' || o.key==='eagle';
+
+  // contrail (planes only) — drawn first so it trails behind the aircraft
+  if(o.contrail && o.contrail.length){
+    ctx.save();
+    for(const c of o.contrail){
+      ctx.globalAlpha = Math.max(0,c.life)*0.5;
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, 5+(1-c.life)*6, 0, Math.PI*2);
+      ctx.fillStyle = '#EFEFEF';
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  ctx.save();
+  ctx.globalAlpha = 1;
+  const ringR = o.r*0.78 + pulse*2;
+
+  // the red contrast disc behind every obstacle is gone too now — you asked for the red
+  // circles floating around flying objects to go entirely. The art itself (kite/bird/eagle/
+  // plane) is dark enough to still read clearly against the sky on its own, and the glowing
+  // eyes + skull badge below still carry the "this is dangerous" cue without a disc behind it.
+
+  ctx.translate(o.x, o.y);
+  // The plane used to bank in direct lockstep with its instantaneous vertical speed, and that
+  // speed flips sign the instant it bounces off the top/bottom of its lane — so the plane would
+  // snap from tilted one way to sharply tilted the other way with no transition, which read as
+  // losing control rather than gliding. You said it should look like it's cruising steadily
+  // instead, so the plane now flies level, full stop — no banking at all, just a steady glide
+  // along its gentle vertical drift. Birds still bank based on their own vertical motion, since
+  // a diving bird banking is the correct look and doesn't have the plane's lane-bounce problem.
+  const bank = isBirdOfPrey
+    ? Math.max(-0.5, Math.min(0.5, (o.vy||0)*0.012))
+    : 0;
+  ctx.rotate(bank);
+  // obstacles travel right-to-left, so face them the natural way (nose/beak pointing left)
+  ctx.scale(-1,1);
+  if(o.key==='kite') drawKiteArt(o.r);
+  else if(o.key==='plane') drawPlaneArt(o.r);
+  else drawBirdArt(o.r, isEagle);
+  ctx.restore();
+
+  // glowing evil eyes — small menacing glint on the kite only now. Birds draw their own glowing
+  // eye directly in drawBirdArt, positioned properly on the head (this generic symmetric pair
+  // used to land over the bird's wing/body instead of its actual eye, which read as random
+  // floating dots once the bird had real anatomy to compare against). The plane doesn't get eyes
+  // at all — a machine doesn't have them, and they were part of why it read as a UFO.
+  if(!isBirdOfPrey && !isPlane){
+    ctx.save();
+    ctx.translate(o.x, o.y);
+    const eyeY = -o.r*0.28, eyeDX = o.r*0.34;
+    for(const sgn of [-1,1]){
+      const ex = sgn*eyeDX;
+      // cheap two-layer glow (soft halo + solid core) instead of shadowBlur, which is costly to
+      // recompute every frame for every obstacle and was contributing to the frame-rate stutter
+      ctx.beginPath(); ctx.arc(ex, eyeY, 5, 0, Math.PI*2);
+      ctx.fillStyle = 'rgba(255,59,48,0.35)';
+      ctx.fill();
+      ctx.beginPath(); ctx.arc(ex, eyeY, 2.6, 0, Math.PI*2);
+      ctx.fillStyle = '#FF3B30';
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // skull warning badge — unmissable "this kills you" cue. Originally only the kite got the
+  // bigger solid-badge version (dark circle + white outline behind the skull) since it was the
+  // hardest obstacle to read against the sky; you then asked for every obstacle to get the same
+  // treatment for consistency, so bird/eagle/plane now match rather than using the older plain
+  // floating-emoji style.
+  const badgeX = o.x + ringR*0.95, badgeY = o.y - ringR*0.95;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(badgeX, badgeY, 11, 0, Math.PI*2);
+  ctx.fillStyle = '#1B1B1F';
+  ctx.fill();
+  ctx.lineWidth = 1.6;
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.stroke();
+  ctx.font = '15px sans-serif';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.globalAlpha = 1;
+  ctx.fillText('💀', badgeX, badgeY);
+  ctx.restore();
+}
+
+function drawFood(f){
+  // was a flat disc + emoji with no depth cues at all — everything else (ground targets, the
+  // poo, obstacles) picked up a shadow/shine pass earlier in the project, but food got missed.
+  // Added a soft drop shadow, a subtle breathing scale pulse (reuses the existing bob phase so
+  // no new per-item state is needed), and a small glossy highlight arc for a "collectible" feel.
+  const by = f.y + Math.sin(f.bob)*4;
+  const pulse = 1 + Math.sin(f.bob*1.3)*0.05;
+  const r = f.r*1.15*pulse;
+  ctx.save();
+  ctx.globalAlpha = 1;
+
+  // soft drop shadow, offset down-right, so the badge feels lifted off the sky behind it
+  ctx.beginPath();
+  ctx.ellipse(f.x+2, by+3, r*0.92, r*0.78, 0, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(0,0,0,0.14)';
+  ctx.fill();
+
+  // solid opaque badge disc so food reads clearly against any scene
+  ctx.beginPath();
+  ctx.arc(f.x, by, r, 0, Math.PI*2);
+  ctx.fillStyle = '#FFFDF0';
+  ctx.fill();
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = '#FFC93C';
+  ctx.stroke();
+
+  // small glossy highlight, top-left, for a bit of shine
+  ctx.beginPath();
+  ctx.ellipse(f.x-r*0.38, by-r*0.4, r*0.32, r*0.18, -0.5, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.fill();
+
+  ctx.font = (f.r*1.8*pulse)+'px sans-serif';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(f.emoji, f.x, by);
+  ctx.restore();
+}
+
+function drawPoop(p){
+  ctx.save();
+  ctx.globalAlpha = 1;
+  // solid backing disc so the poo reads clearly mid-flight
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, 17, 0, Math.PI*2);
+  ctx.fillStyle = '#FFFDF0';
+  ctx.fill();
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = '#8B6F3E';
+  ctx.stroke();
+
+  ctx.font='26px sans-serif';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText('💩', p.x, p.y);
+  ctx.restore();
+}
+
+function drawReticle(){
+  if(state!=='playing') return;
+  const ready = pooCharge>=POO_MAX;
+  const pred = predictLanding();
+  const target = targetAtLanding(pred.x, pred.t);
+  const color = target ? (target.good ? '#3FA34D' : '#E0483E') : '#8b8578';
+
+  // trajectory dots (always visible, subtle while charging)
+  ctx.save();
+  ctx.globalAlpha = ready ? 0.9 : 0.35;
+  const steps = 10;
+  for(let i=1;i<=steps;i++){
+    const tt = pred.t*(i/steps);
+    const x = bird.x+10;
+    const y = (bird.y+6) + POO_VY0*tt + 0.5*POO_G*tt*tt;
+    ctx.beginPath();
+    ctx.arc(x,y, ready?3:2, 0, Math.PI*2);
+    ctx.fillStyle = ready ? color : '#ffffff';
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // landing reticle
+  ctx.save();
+  const cy = groundY-16;
+  ctx.globalAlpha = ready ? 1 : 0.55;
+  ctx.strokeStyle = color; ctx.lineWidth = ready?3:2;
+  ctx.beginPath(); ctx.arc(pred.x, cy, ready?16:11, 0, Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(pred.x-6,cy); ctx.lineTo(pred.x+6,cy); ctx.moveTo(pred.x,cy-6); ctx.lineTo(pred.x,cy+6); ctx.stroke();
+
+  if(ready){
+    ctx.font = "800 14px 'Baloo 2', sans-serif";
+    ctx.textAlign='center';
+    ctx.fillStyle = color;
+    ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth=3;
+    const label = target ? ('+'+target.pts) : 'MISS';
+    ctx.strokeText(label, pred.x, cy-24);
+    ctx.fillText(label, pred.x, cy-24);
+  }
+  ctx.restore();
+}
+
+function drawTrail(){
+  const sk = SKINS[equippedSkin] || SKINS.classic;
+  if(!sk.trail) return;
+  for(const t of trail){
+    const color = sk.trail==='rainbow' ? `hsl(${(elapsed*80)%360},85%,65%)` : sk.trail;
+    ctx.save();
+    ctx.globalAlpha = Math.max(0,t.life)*0.55;
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, 5*t.life+2, 0, Math.PI*2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+function drawSparkle(x,y,size,alpha){
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = '#FFFFFF';
+  ctx.beginPath();
+  ctx.moveTo(x, y-size); ctx.lineTo(x+size*0.28, y-size*0.28); ctx.lineTo(x+size, y); ctx.lineTo(x+size*0.28, y+size*0.28);
+  ctx.lineTo(x, y+size); ctx.lineTo(x-size*0.28, y+size*0.28); ctx.lineTo(x-size, y); ctx.lineTo(x-size*0.28, y-size*0.28);
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+
+function drawBird(){
+  const sk = SKINS[equippedSkin] || SKINS.classic;
+  let bodyColor = sk.body, wingColor = sk.wing, backColor = sk.back;
+  if(sk.special==='rainbow'){
+    const hue = (elapsed*80)%360;
+    bodyColor = `hsl(${hue},85%,72%)`;
+    wingColor = `hsl(${(hue+30)%360},80%,62%)`;
+    backColor = `hsl(${(hue+60)%360},70%,50%)`;
+  } else if(sk.special==='diamond'){
+    // slow silvery shimmer between two near-white tones, rather than a fixed flat color
+    const shimmer = (Math.sin(elapsed*2.2)+1)/2;
+    bodyColor = shimmer>0.5 ? '#FFFFFF' : '#E7F3FF';
+    wingColor = shimmer>0.5 ? '#DFF0FF' : '#C7E4FF';
+  }
+  ctx.save();
+  ctx.translate(bird.x, bird.y);
+  const tilt = Math.max(-0.5, Math.min(0.9, bird.vy/700));
+  ctx.rotate(tilt);
+  if(sk.glow){ ctx.shadowColor = sk.glow; ctx.shadowBlur = 12; }
+  // Two earlier attempts at this (a two-segment shoulder+hand rig, then a fold/extend version)
+  // both turned out too subtle to actually read as flapping at gameplay size — the wingtip
+  // just wasn't moving far enough. This version drops the subtlety: one wing, rotating through
+  // a much bigger arc around a pivot near the top of the back, so the tip clearly swings from
+  // above the bird's back (upstroke) to well below its belly (downstroke) — a big, obvious
+  // up-down sweep instead of a small angle wobble. A darker tip band (using the skin's back
+  // color) rides along for a bit of feather-tip depth, but the swing itself is the whole point.
+  const wingSwing = Math.sin(bird.wingPhase); // -1 (downstroke) .. 1 (upstroke)
+  const wingAngle = wingSwing*1.15 - 0.12;
+  ctx.save();
+  ctx.translate(-4,-4);
+  ctx.rotate(wingAngle);
+  ctx.fillStyle = wingColor;
+  ctx.beginPath(); ctx.ellipse(-16, 0, 20, 8, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = backColor;
+  ctx.beginPath(); ctx.ellipse(-28, 0, 9, 6, 0, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+  ctx.fillStyle = bodyColor;
+  ctx.beginPath(); ctx.ellipse(0,0, 19, 14, 0, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(15,-6, 10, 9, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = backColor;
+  ctx.beginPath(); ctx.ellipse(-6,-6, 12, 6, -0.3, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#FF9F1C';
+  ctx.beginPath(); ctx.moveTo(23,-7); ctx.lineTo(34,-4); ctx.lineTo(23,-2); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#1F2430';
+  ctx.beginPath(); ctx.arc(18,-9,2.1,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle = '#FF9F1C'; ctx.lineWidth=2.5;
+  ctx.beginPath(); ctx.moveTo(2,12); ctx.lineTo(2,19); ctx.lineTo(7,19); ctx.moveTo(2,19); ctx.lineTo(-3,19); ctx.stroke();
+  ctx.shadowBlur = 0;
+  if(sk.special==='diamond'){
+    // a couple of small orbiting glints — the flourish a 30,000-coin skin should have
+    for(let i=0;i<2;i++){
+      const ang = elapsed*1.6 + i*Math.PI;
+      const sx = Math.cos(ang)*26, sy = Math.sin(ang)*16 - 4;
+      const tw = (Math.sin(elapsed*5 + i*2)+1)/2;
+      drawSparkle(sx, sy, 3.5+tw*2, 0.4+tw*0.6);
+    }
+  }
+  ctx.restore();
+}
+
+function drawComboBadge(){
+  if(state!=='playing' || comboStreak<2) return;
+  const tier = comboTier(comboStreak);
+  if(!tier) return;
+  const label = '🔥 STREAK ×'+comboStreak+'  '+tier.label;
+  ctx.save();
+  ctx.font = "800 15px 'Baloo 2', sans-serif";
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 3.5;
+  ctx.strokeText(label, W/2, 60);
+  ctx.fillStyle = tier.mult>=1.75 ? '#FF6A00' : '#FFD866';
+  ctx.fillText(label, W/2, 60);
+  ctx.restore();
+}
+
+function drawPopups(){
+  for(const p of popups){
+    ctx.save();
+    ctx.globalAlpha = Math.max(0,p.life);
+    ctx.font = "800 18px 'Baloo 2', sans-serif";
+    ctx.textAlign = 'center';
+    ctx.fillStyle = p.color;
+    ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+    ctx.lineWidth = 3;
+    ctx.strokeText(p.text, p.x, p.y);
+    ctx.fillText(p.text, p.x, p.y);
+    ctx.restore();
+  }
+}
+
+function drawSplats(){
+  for(const s of splats){
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, s.life);
+    if(s.ring){
+      const t = 1-Math.max(0,s.life);
+      ctx.strokeStyle = s.color; ctx.lineWidth = 3*(1-t)+0.5;
+      ctx.beginPath(); ctx.ellipse(s.x, s.y, 6+t*26, 3+t*10, 0, 0, Math.PI*2); ctx.stroke();
+    } else {
+      ctx.fillStyle = s.color;
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+
+function dist(x1,y1,x2,y2){ return Math.hypot(x1-x2,y1-y2); }
+
+// ============================================================
+// MAIN LOOP
+// ============================================================
+let lastT = performance.now();
+function loop(now){
+  let dt = (now-lastT)/1000;
+  if(dt>0.05) dt=0.05;
+  lastT = now;
+  if(state==='playing') update(dt);
+  if(screenShake>0) screenShake = Math.max(0, screenShake-dt);
+  render();
+  requestAnimationFrame(loop);
+}
+
+function update(dt){
+  elapsed += dt;
+  worldSpeed = 190 + Math.min(180, elapsed*3.4);
+  score += dt*4;
+
+  // scene progression
+  const idx = Math.floor(elapsed/SCENE_DURATION) % SCENES.length;
+  if(idx !== sceneIndex){
+    sceneIndex = idx; scene = SCENES[idx];
+    regenDecor(scene);
+    showBanner(scene.name);
+  }
+  if(bannerTimer>0){ bannerTimer -= dt; if(bannerTimer<=0) sceneBanner.classList.remove('show'); }
+
+  // bird physics
+  bird.vy += GRAVITY*dt;
+  if(bird.vy > MAX_FALL_VY) bird.vy = MAX_FALL_VY;
+  bird.y += bird.vy*dt;
+  bird.wingPhase += dt*(12 + (bird.wingBoost||0)*20);
+  bird.wingBoost = Math.max(0, (bird.wingBoost||0) - dt*3.2);
+  if(bird.y < 10){ bird.y = 10; bird.vy = Math.max(60, Math.abs(bird.vy)*0.35); } // bounce off the ceiling instead of resting there for free
+  if(bird.y > groundY-10){ Audio_.sfx.crash(); endGame(); return; }
+
+  // decor scroll
+  for(const b of decorFar){ b.x -= worldSpeed*0.28*dt; }
+  for(const b of decorNear){ b.x -= worldSpeed*0.5*dt; }
+  wrapDecor(decorFar, decorFarGap); wrapDecor(decorNear, decorNearGap);
+
+  // targets
+  targetTimer -= dt;
+  if(targetTimer<=0){ spawnTarget(); targetTimer = targetSpawnInterval(); }
+  for(const t of targets){ t.x -= worldSpeed*dt; }
+  targets = targets.filter(t=> t.x > -100);
+
+  // obstacles (eased in)
+  obstacleTimer -= dt;
+  if(obstacleTimer<=0){
+    const keys = allowedObstacleKeys();
+    const key = keys[Math.floor(rng()*keys.length)];
+    const type = OB_TYPES[key];
+    const isPlane = key==='plane';
+    // every 4th spawn is forced into a genuinely ceiling-threatening y-range
+    // (y:20-40 - within every obstacle type's collision reach of a bird
+    // pinned at y:10, verified against the smallest obstacle's radius) so
+    // camping the very top can never go more than ~3 spawns unthreatened.
+    // The other 3-of-4 spawns keep the full-range uniform roll for normal
+    // variety everywhere else on screen.
+    spawnsSinceTopThreat++;
+    let y;
+    if(spawnsSinceTopThreat>=4){
+      y = 20+rng()*20;
+      spawnsSinceTopThreat = 0;
+    } else {
+      y = 20+rng()*(groundY-130);
+    }
+    obstacles.push({
+      x: W+50, y,
+      r:type.r, key:key, emoji:type.emoji, speed: worldSpeed*type.speedMul + 20,
+      vy: isPlane ? (rng()-0.5)*46 : 0,
+      contrail: isPlane ? [] : null,
+      contrailTimer: 0
+    });
+    const base = elapsed<10 ? 2.0 : 1.6;
+    obstacleTimer = Math.max(0.55, base - elapsed*0.02);
+  }
+  for(const o of obstacles){
+    o.x -= o.speed*dt;
+    if(o.contrail){
+      // planes actually fly a path — drift vertically and bounce within a lane, trailing smoke
+      o.y += o.vy*dt;
+      if(o.y < 40){ o.y = 40; o.vy = Math.abs(o.vy); }
+      if(o.y > groundY-100){ o.y = groundY-100; o.vy = -Math.abs(o.vy); }
+      o.contrailTimer -= dt;
+      if(o.contrailTimer<=0){
+        o.contrail.push({x:o.x + o.r*0.85, y:o.y, life:1});
+        o.contrailTimer = 0.045;
+      }
+      for(const c of o.contrail){ c.life -= dt*0.9; c.x -= worldSpeed*0.4*dt; }
+      o.contrail = o.contrail.filter(c=> c.life>0);
+    }
+  }
+  obstacles = obstacles.filter(o=> o.x > -80);
+
+  // food
+  foodTimer -= dt;
+  if(foodTimer<=0){
+    const type = FOOD_TYPES[Math.floor(rng()*FOOD_TYPES.length)];
+    foods.push({ x:W+40, y:60+rng()*(groundY-200), r:type.r, emoji:type.emoji, charge:type.charge, bob:Math.random()*10 });
+    foodTimer = 1.1 + rng()*1.0;
+  }
+  for(const f of foods){ f.x -= worldSpeed*dt; f.bob += dt*4; }
+  foods = foods.filter(f=> f.x > -40);
+
+  // poop projectiles
+  for(const p of poops){
+    p.vy += POO_G*dt;
+    p.x += p.vx*dt;
+    p.y += p.vy*dt;
+  }
+  for(const p of poops){
+    if(p.y >= groundY-16 && !p.resolved){ p.resolved = true; resolvePooHit(p.x); }
+  }
+  poops = poops.filter(p=> !p.resolved && p.y < groundY+20);
+
+  // collisions
+  for(const o of obstacles){
+    if(dist(bird.x,bird.y,o.x,o.y) < (bird.r+o.r*0.6)){ Audio_.sfx.crash(); endGame(); return; }
+  }
+  for(const f of foods){
+    if(!f.taken && dist(bird.x,bird.y,f.x,f.y) < (bird.r+f.r*0.7)){
+      f.taken = true;
+      pooCharge = Math.min(POO_MAX, pooCharge + f.charge);
+      score += 5;
+      addPopup(f.x, f.y-10, '+5', '#3FA34D');
+      Audio_.sfx.foodPickup();
+    }
+  }
+  foods = foods.filter(f=> !f.taken);
+
+  for(const p of popups){ p.life -= dt*0.9; p.y += p.vy*dt; }
+  popups = popups.filter(p=> p.life>0);
+
+  for(const s of splats){
+    s.life -= dt*2.6;
+    if(!s.ring){ s.vy += 260*dt; s.x += s.vx*dt; s.y += s.vy*dt; }
+  }
+  splats = splats.filter(s=> s.life>0);
+
+  // skin trail
+  const skForTrail = SKINS[equippedSkin] || SKINS.classic;
+  if(skForTrail.trail){ trail.push({x:bird.x-16, y:bird.y+2, life:1}); }
+  for(const t of trail){ t.life -= dt*2.2; t.x -= worldSpeed*dt; }
+  trail = trail.filter(t=> t.life>0);
+
+  updateHUD();
+}
+
+function resolvePooHit(x){
+  const hit = targetAt(x);
+  if(hit){
+    comboStreak++;
+    const mult = comboMultiplier(comboStreak);
+    const pts = Math.round(hit.pts*mult);
+    score += pts;
+    addPopup(hit.x, groundY-50, (pts>0?'+':'')+pts, hit.good?'#3FA34D':'#E0483E');
+    if(mult>1){ addPopup(hit.x, groundY-72, 'COMBO '+comboTier(comboStreak).label, '#C9A24B'); }
+    addSplat(hit.x, groundY-16, hit.good?'#7ED957':'#E0483E');
+    targets = targets.filter(t=>t!==hit);
+    hit.good ? Audio_.sfx.splatGood() : Audio_.sfx.splatBad();
+    if(mult>1) Audio_.sfx.combo();
+  } else {
+    comboStreak = 0;
+    addPopup(x, groundY-40, 'miss', '#8b8578');
+    addSplat(x, groundY-16, '#8B6F3E');
+    Audio_.sfx.splatMiss();
+  }
+}
+
+function render(){
+  const shaking = screenShake>0;
+  if(shaking){
+    const mag = SHAKE_MAG * (screenShake/SHAKE_DURATION);
+    ctx.save();
+    ctx.translate((Math.random()*2-1)*mag, (Math.random()*2-1)*mag);
+  }
+  drawSky();
+  const farDecorType = scene.decor==='harbour' ? 'buildings' : scene.decor==='beach' ? 'beachFar' : scene.decor==='seaside' ? 'seasideFar' : scene.decor;
+  drawDecorLayer(decorFar, 0.55, groundY-20, farDecorType);
+  drawDecorLayer(decorNear, 0.9, groundY, scene.decor==='harbour' ? 'cranes' : scene.decor);
+  drawGround();
+  for(const t of targets) drawTarget(t);
+  for(const f of foods) drawFood(f);
+  drawReticle();
+  for(const o of obstacles) drawObstacle(o);
+  for(const p of poops) drawPoop(p);
+  drawSplats();
+  drawTrail();
+  drawBird();
+  drawComboBadge();
+  drawPopups();
+  if(shaking) ctx.restore();
+}
+
+// ==========================================================================
+// ---------- AUDIO ----------
+// Procedurally-generated with the Web Audio API — no external asset files,
+// so there's nothing to license and nothing to bundle. This is deliberately
+// kept as one self-contained module: swapping the backing track for a
+// recorded/licensed one later just means replacing the contents of
+// startMusic()/scheduleMusic() with an <audio>/AudioBufferSourceNode loop —
+// every SFX call site elsewhere in the game stays untouched.
+// ==========================================================================
+const Audio_ = (function(){
+  let actx = null;
+  let masterGain, musicGain, sfxGain;
+  let unlocked = false;
+  let muted = false;
+
+  function ensureContext(){
+    if(actx) return true;
+    try{
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if(!AC) return false;
+      actx = new AC();
+      masterGain = actx.createGain(); masterGain.gain.value = muted ? 0 : 1;
+      masterGain.connect(actx.destination);
+      musicGain = actx.createGain(); musicGain.gain.value = 0.35;
+      musicGain.connect(masterGain);
+      sfxGain = actx.createGain(); sfxGain.gain.value = 0.55;
+      sfxGain.connect(masterGain);
+      return true;
+    }catch(e){ return false; }
+  }
+
+  // Browsers require a user gesture before audio can play — the game already
+  // gates its first real action behind a tap/click/key, so we piggyback on
+  // that same first gesture rather than asking for a separate "enable sound" step.
+  function unlock(){
+    if(unlocked) return;
+    if(!ensureContext()) return;
+    unlocked = true;
+    if(actx.state === 'suspended') actx.resume();
+    startMusic();
+  }
+
+  async function loadMutePref(){
+    try{
+      const m = await Store.get('gullbomber:muted', false);
+      muted = !!(m && m.value === '1');
+    }catch(e){ muted = false; }
+    updateMuteUI();
+  }
+  function toggleMute(){
+    muted = !muted;
+    if(masterGain) masterGain.gain.setTargetAtTime(muted?0:1, actx.currentTime, 0.05);
+    try{ Store.set('gullbomber:muted', muted?'1':'0', false); }catch(e){}
+    updateMuteUI();
+  }
+  function updateMuteUI(){
+    const btn = document.getElementById('muteBtn');
+    if(btn) btn.textContent = muted ? '🔇' : '🔊';
+  }
+
+  // ---- low-level synth helpers ----
+  function pluck(freq, dur, t, peak, type){
+    if(!actx) return;
+    const osc = actx.createOscillator();
+    const g = actx.createGain();
+    osc.type = type || 'triangle';
+    osc.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(peak, t+0.008);
+    g.gain.exponentialRampToValueAtTime(0.0008, t+dur);
+    osc.connect(g); g.connect(sfxGain);
+    osc.start(t); osc.stop(t+dur+0.02);
+  }
+  function musicPluck(freq, dur, t, peak, type){
+    if(!actx) return;
+    const osc = actx.createOscillator();
+    const g = actx.createGain();
+    osc.type = type || 'triangle';
+    osc.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(peak, t+0.015);
+    g.gain.exponentialRampToValueAtTime(0.0006, t+dur);
+    osc.connect(g); g.connect(musicGain);
+    osc.start(t); osc.stop(t+dur+0.02);
+  }
+  function sweep(f0, f1, dur, t, peak, type){
+    if(!actx) return;
+    const osc = actx.createOscillator();
+    const g = actx.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.setValueAtTime(f0, t);
+    osc.frequency.exponentialRampToValueAtTime(Math.max(20,f1), t+dur);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(peak, t+0.01);
+    g.gain.exponentialRampToValueAtTime(0.0008, t+dur);
+    osc.connect(g); g.connect(sfxGain);
+    osc.start(t); osc.stop(t+dur+0.02);
+  }
+  let noiseBuffer = null;
+  function getNoiseBuffer(){
+    if(noiseBuffer) return noiseBuffer;
+    const len = actx.sampleRate*1.0;
+    noiseBuffer = actx.createBuffer(1, len, actx.sampleRate);
+    const d = noiseBuffer.getChannelData(0);
+    for(let i=0;i<len;i++) d[i] = Math.random()*2-1;
+    return noiseBuffer;
+  }
+  function noiseBurst(dur, t, peak, filterFreq, filterType, dest){
+    if(!actx) return;
+    const src = actx.createBufferSource();
+    src.buffer = getNoiseBuffer();
+    const filt = actx.createBiquadFilter();
+    filt.type = filterType || 'bandpass';
+    filt.frequency.setValueAtTime(filterFreq||1000, t);
+    const g = actx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(peak, t+0.006);
+    g.gain.exponentialRampToValueAtTime(0.0008, t+dur);
+    src.connect(filt); filt.connect(g); g.connect(dest||sfxGain);
+    src.start(t); src.stop(t+dur+0.02);
+  }
+
+  // ---- SFX ----
+  const sfx = {
+    flap(){
+      if(!actx) return; const t=actx.currentTime; const dur = 0.16;
+      // one continuous air-burst with the filter sweeping down, rather than
+      // several staggered hits (which read as a springy "boing-boing")
+      const src = actx.createBufferSource();
+      src.buffer = getNoiseBuffer();
+      const filt = actx.createBiquadFilter();
+      filt.type = 'bandpass';
+      filt.Q.value = 0.9;
+      filt.frequency.setValueAtTime(1300, t);
+      filt.frequency.exponentialRampToValueAtTime(500, t+dur);
+      const g = actx.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.32, t+0.02);
+      g.gain.exponentialRampToValueAtTime(0.0008, t+dur);
+      src.connect(filt); filt.connect(g); g.connect(sfxGain);
+      src.start(t); src.stop(t+dur+0.02);
+      // flat, unpitched thump for the downward push - no frequency sweep,
+      // so it reads as a soft thud rather than a spring "boing"
+      const thump = actx.createOscillator();
+      const tg = actx.createGain();
+      thump.type = 'sine';
+      thump.frequency.value = 95;
+      tg.gain.setValueAtTime(0, t);
+      tg.gain.linearRampToValueAtTime(0.1, t+0.012);
+      tg.gain.exponentialRampToValueAtTime(0.0006, t+0.1);
+      thump.connect(tg); tg.connect(sfxGain);
+      thump.start(t); thump.stop(t+0.12);
+    },
+    pooLaunch(){
+      if(!actx) return; const t=actx.currentTime; const dur = 0.24;
+      // a proper comedic "poop drop" - a buzzy, wobbling raspberry-ish tone
+      // (rapid up/down pitch wiggles trending downward) over a wet squelch.
+      // Punched up in gain so it reads clearly against flap/music.
+      const osc = actx.createOscillator();
+      const g = actx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(150, t);
+      osc.frequency.linearRampToValueAtTime(195, t+0.03);
+      osc.frequency.linearRampToValueAtTime(110, t+0.07);
+      osc.frequency.linearRampToValueAtTime(150, t+0.11);
+      osc.frequency.linearRampToValueAtTime(75, t+dur);
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.42, t+0.015);
+      g.gain.exponentialRampToValueAtTime(0.0006, t+dur);
+      osc.connect(g); g.connect(sfxGain);
+      osc.start(t); osc.stop(t+dur+0.02);
+      noiseBurst(0.15, t, 0.3, 350, 'lowpass');
+    },
+    splatGood(){
+      if(!actx) return; const t=actx.currentTime;
+      pluck(523.25, 0.18, t, 0.32, 'triangle');
+      pluck(659.25, 0.18, t+0.06, 0.3, 'triangle');
+      pluck(783.99, 0.22, t+0.12, 0.28, 'triangle');
+      noiseBurst(0.09, t, 0.2, 500, 'lowpass');
+    },
+    splatBad(){
+      if(!actx) return; const t=actx.currentTime;
+      pluck(196.00, 0.22, t, 0.3, 'sawtooth');
+      pluck(174.61, 0.28, t+0.09, 0.26, 'sawtooth');
+      noiseBurst(0.12, t, 0.22, 350, 'lowpass');
+    },
+    splatMiss(){ if(!actx) return; const t=actx.currentTime; noiseBurst(0.14, t, 0.22, 400, 'lowpass'); },
+    foodPickup(){
+      if(!actx) return; const t=actx.currentTime;
+      pluck(880, 0.09, t, 0.22, 'square');
+      pluck(1108.73, 0.12, t+0.045, 0.22, 'square');
+    },
+    combo(){
+      if(!actx) return; const t=actx.currentTime;
+      [523.25,659.25,783.99,1046.5].forEach((f,i)=>pluck(f, 0.16, t+i*0.045, 0.3, 'triangle'));
+    },
+    crash(){
+      if(!actx) return; const t=actx.currentTime;
+      // panicked squawk - a jagged upward-then-cracking pitch bend
+      const squawk = actx.createOscillator();
+      const sg = actx.createGain();
+      squawk.type = 'sawtooth';
+      squawk.frequency.setValueAtTime(420, t);
+      squawk.frequency.exponentialRampToValueAtTime(920, t+0.06);
+      squawk.frequency.exponentialRampToValueAtTime(260, t+0.16);
+      squawk.frequency.exponentialRampToValueAtTime(180, t+0.3);
+      sg.gain.setValueAtTime(0, t);
+      sg.gain.linearRampToValueAtTime(0.32, t+0.015);
+      sg.gain.exponentialRampToValueAtTime(0.0008, t+0.32);
+      squawk.connect(sg); sg.connect(sfxGain);
+      squawk.start(t); squawk.stop(t+0.34);
+      // bigger, broader impact crunch than a regular splat
+      noiseBurst(0.4, t+0.02, 0.6, 900, 'lowpass');
+      noiseBurst(0.25, t+0.02, 0.35, 2200, 'highpass');
+      // low falling thud underneath
+      sweep(220,45,0.45,t,0.42,'sawtooth');
+    },
+    pooReady(){ if(!actx) return; const t=actx.currentTime; pluck(659.25,0.14,t,0.22,'sine'); pluck(987.77,0.22,t+0.09,0.2,'sine'); },
+    uiClick(){ if(!actx) return; const t=actx.currentTime; pluck(1200, 0.05, t, 0.15, 'square'); },
+    equip(){
+      if(!actx) return; const t=actx.currentTime;
+      pluck(700, 0.07, t, 0.22, 'square');
+      pluck(1050, 0.09, t+0.04, 0.2, 'square');
+    },
+    newBest(){
+      if(!actx) return; const t=actx.currentTime;
+      [523.25,659.25,783.99,1046.5,1318.5].forEach((f,i)=>pluck(f, 0.22, t+i*0.06, 0.34, 'triangle'));
+      pluck(1567.98, 0.4, t+0.34, 0.3, 'triangle');
+    },
+    unlock(){
+      if(!actx) return; const t=actx.currentTime;
+      // quick ascending twinkly run - distinct from newBest's fuller fanfare
+      [880,987.77,1108.73,1244.51,1396.91,1567.98].forEach((f,i)=>pluck(f, 0.14, t+i*0.03, 0.18, 'triangle'));
+    },
+    saveSuccess(){
+      if(!actx) return; const t=actx.currentTime;
+      pluck(783.99, 0.1, t, 0.2, 'sine');
+      pluck(1046.5, 0.16, t+0.06, 0.22, 'sine');
+    },
+    dailyReward(){
+      if(!actx) return; const t=actx.currentTime;
+      // coin-clink jingle for the surprise retroactive reward toast
+      for(let i=0;i<5;i++) pluck(1046.5 + (i%2)*220, 0.13, t+i*0.075, 0.22, 'square');
+    },
+    sceneChange(){
+      if(!actx) return; const t=actx.currentTime;
+      sweep(440,880,0.35,t,0.18,'sine'); noiseBurst(0.2,t,0.08,3000,'highpass');
+    },
+  };
+
+  // ---- backing track ----
+  // Breezy, sparse coastal loop: root-note bass + a 4-note arpeggio per chord,
+  // cycling through a simple 4-chord progression. A soft shaker layer joins in
+  // only while a round is actually being played, for a bit of extra lift
+  // without needing a second full arrangement.
+  const PROGRESSION = [
+    { bass:130.81, chord:[261.63,329.63,392.00,329.63] }, // C
+    { bass:110.00, chord:[220.00,261.63,329.63,261.63] }, // Am
+    { bass:87.31,  chord:[174.61,220.00,261.63,220.00] }, // F
+    { bass:98.00,  chord:[196.00,246.94,293.66,246.94] }, // G
+  ];
+  const BPM = 114;
+  const beatDur = 60/BPM;
+  let musicStarted = false;
+  let nextNoteTime = 0;
+  let beatCount = 0;
+  let schedulerTimer = null;
+
+  // light arcade-style kick + snare, layered under the melody only while a
+  // round is actually being played - a bit of rhythmic drive to match the
+  // combo-chasing/high-score arcade feel, without turning the menu noisy
+  function kick(t){
+    if(!actx) return;
+    const osc = actx.createOscillator();
+    const g = actx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(140, t);
+    osc.frequency.exponentialRampToValueAtTime(48, t+0.11);
+    g.gain.setValueAtTime(0.001, t);
+    g.gain.linearRampToValueAtTime(0.22, t+0.006);
+    g.gain.exponentialRampToValueAtTime(0.0008, t+0.13);
+    osc.connect(g); g.connect(musicGain);
+    osc.start(t); osc.stop(t+0.15);
+  }
+  function snare(t){
+    noiseBurst(0.09, t, 0.13, 1800, 'highpass', musicGain);
+  }
+
+  function scheduleMusic(){
+    if(!actx) return;
+    while(nextNoteTime < actx.currentTime + 0.2){
+      const chordIdx = Math.floor(beatCount/4) % PROGRESSION.length;
+      const step = beatCount % 4;
+      const c = PROGRESSION[chordIdx];
+      if(step===0) musicPluck(c.bass, beatDur*3.6, nextNoteTime, 0.22, 'sine');
+      musicPluck(c.chord[step], beatDur*0.9, nextNoteTime, 0.11, 'triangle');
+      // shaker on the off-beat, gameplay only
+      if(state==='playing'){
+        noiseBurst(0.05, nextNoteTime+beatDur*0.5, 0.06, 6000, 'highpass', musicGain);
+        // four-on-the-floor kick, snare on the backbeat (steps 1 and 3)
+        kick(nextNoteTime);
+        if(step===1 || step===3) snare(nextNoteTime);
+      }
+      beatCount++;
+      nextNoteTime += beatDur;
+    }
+  }
+  function startMusic(){
+    if(musicStarted || !actx) return;
+    musicStarted = true;
+    nextNoteTime = actx.currentTime + 0.05;
+    beatCount = 0;
+    schedulerTimer = setInterval(scheduleMusic, 100);
+  }
+
+  return {
+    unlock, sfx, toggleMute, loadMutePref,
+    isMuted(){ return muted; },
+  };
+})();
+window.addEventListener('mousedown', ()=>Audio_.unlock(), {once:true});
+window.addEventListener('touchstart', ()=>Audio_.unlock(), {once:true});
+window.addEventListener('keydown', ()=>Audio_.unlock(), {once:true});
+Audio_.loadMutePref();
+
+// ---------- init ----------
+if(window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches){
+  document.body.classList.add('is-desktop');
+}
+resize();
+resetBird();
+regenDecor(scene);
+loadBest();
+loadDailyBest();
+loadProgress().then(loadPendingDailyReward);
+requestAnimationFrame(loop);
+
+})();
+</script>
+</body>
+</html>
